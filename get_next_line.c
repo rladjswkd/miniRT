@@ -55,7 +55,7 @@ static char	*build_line(t_builder *b)
 		b->len = 0;
 		return (line);
 	}
-	line = get_part(b->data, 0, b->index + 1, 1);
+	line = get_part(b->data, 0, b->index, 1);
 	if (!line)
 		return (0);
 	temp_data = get_part(b->data, b->index + 1, b->len - (b->index + 1), 0);
