@@ -36,6 +36,14 @@ typedef struct s_light
 	t_rgb			rgb;
 }	t_light;
 
+
+typedef struct s_camera
+{
+	t_coordinate	coordinate;
+	t_vector		normalized;
+	int				fov;
+}	t_camera;
+
 int	check_rgb(t_rgb rgb)
 {
 	int	r;
@@ -134,8 +142,7 @@ int	set_light(char **info, t_light *l)// caller must check whether the count of 
 	if (!set_coordinate(info[1], &coordinate))
 		return (0);
 	if (!get_double(info[2], &intensitiy)
-		|| intensitiy < 0 || 1 < intensitiy
-		|| !check_comma_cnt(info[2]))
+		|| intensitiy < 0 || 1 < intensitiy)
 		return (0);
 	if (!set_rgb(info[3], &rgb))
 		return (0);
@@ -146,6 +153,31 @@ int	set_light(char **info, t_light *l)// caller must check whether the count of 
 	l->rgb.r = rgb.r;
 	l->rgb.g = rgb.g;
 	l->rgb.b = rgb.b;
+	return (1);
+}
+
+
+int	set_camera(char **info, t_camera *c)// caller must check whether the count of splitted is 4. and this function is called only if splitted[0] is "C"
+{
+	t_coordinate	coordinate;
+	t_vector		normalized;
+	int				fov;
+
+	if (!set_coordinate(info[1], &coordinate))
+		return (0);
+	if (!set_coordinate(info[2], &normalized)
+		|| check_normal(normalized))
+		return (0);
+	if (!get_int(info[3], &fov)
+		|| fov < 0 || 180 < fov) // 180 0
+		return (0);
+	c->coordinate.x = coordinate.x;
+	c->coordinate.y = coordinate.y;
+	c->coordinate.z = coordinate.z;
+	c->normalized.x = normalized.x;
+	c->normalized.y = normalized.y;
+	c->normalized.z = normalized.z;
+	c->fov = fov;
 	return (1);
 }
 
@@ -181,36 +213,36 @@ int	main(int argc, char **argv)
 	// 		printf("%s\n", p); // 유효성 검사 수행하는 함수 호출
 	// 	free(p);
 	// }
-	char		*str1 = "L -40.0,50.0,0.0 0.2 10,0,255";
-	char		*str2 = "L -20.51,0.02,-0.0001 0.44 255,255,255";
-	char		*str3 = "L -40.0,50.0,0.0 2.0 10,244,255";
-	char		*str4 = "L -40.0,50.0,0.0 0.999 10,0,255";
-	char		*str5 = "L -40.0,50.0,0.0 0.2 10,0,255";
+
+	char		*str1 = "C -50.0,50.0,0.0 0,0,1 70";
+	char		*str2 = "C -50.1,50.0,0.0 0,2,1 70";
+	char		*str3 = "C -50.2,50.0,0.0 0,0,1 181";
+	char		*str4 = "C -50.3,50.0,0.0 0,0,1 70";
+	char		*str5 = "C -50.4,50.0,0.2313 0,0,1 70";
 
 
-	t_light	l;
 	char		**splitted;
 	int			count;
 
 	splitted = split_line(str1, ' ', &count);
-	if (set_light(splitted, &l))
-		printf("coordinate x,y,z: %f, %f, %f intensity : %f, r,g,b: %d, %d, %d\n", l.coordinate.x, l.coordinate.y, l.coordinate.z, l.intensity, l.rgb.r, l.rgb.g, l.rgb.b);
+	if (set_camera(splitted, &c))
+		printf("coordinate x,y,z: %f, %f, %f normalized x,y,z: %f, %f, %f fov : %d\n", c.coordinate.x, c.coordinate.y, c.coordinate.z, c.normalized.x, c.normalized.y, c.normalized.z, c.fov);
 	free_splitted(splitted);
 	splitted = split_line(str2, ' ', &count);
-	if (set_light(splitted, &l))
-		printf("coordinate x,y,z: %f, %f, %f intensity : %f, r,g,b: %d, %d, %d\n", l.coordinate.x, l.coordinate.y, l.coordinate.z, l.intensity, l.rgb.r, l.rgb.g, l.rgb.b);
+	if (set_camera(splitted, &c))
+		printf("coordinate x,y,z: %f, %f, %f normalized x,y,z: %f, %f, %f fov : %d\n", c.coordinate.x, c.coordinate.y, c.coordinate.z, c.normalized.x, c.normalized.y, c.normalized.z, c.fov);
 	free_splitted(splitted);
 	splitted = split_line(str3, ' ', &count);
-	if (set_light(splitted, &l))
-		printf("coordinate x,y,z: %f, %f, %f intensity : %f, r,g,b: %d, %d, %d\n", l.coordinate.x, l.coordinate.y, l.coordinate.z, l.intensity, l.rgb.r, l.rgb.g, l.rgb.b);
+	if (set_camera(splitted, &c))
+		printf("coordinate x,y,z: %f, %f, %f normalized x,y,z: %f, %f, %f fov : %d\n", c.coordinate.x, c.coordinate.y, c.coordinate.z, c.normalized.x, c.normalized.y, c.normalized.z, c.fov);
 	free_splitted(splitted);
 	splitted = split_line(str4, ' ', &count);
-	if (set_light(splitted, &l))
-		printf("coordinate x,y,z: %f, %f, %f intensity : %f, r,g,b: %d, %d, %d\n", l.coordinate.x, l.coordinate.y, l.coordinate.z, l.intensity, l.rgb.r, l.rgb.g, l.rgb.b);
+	if (set_camera(splitted, &c))
+		printf("coordinate x,y,z: %f, %f, %f normalized x,y,z: %f, %f, %f fov : %d\n", c.coordinate.x, c.coordinate.y, c.coordinate.z, c.normalized.x, c.normalized.y, c.normalized.z, c.fov);
 	free_splitted(splitted);
 	splitted = split_line(str5, ' ', &count);
-	if (set_light(splitted, &l))
-		printf("coordinate x,y,z: %f, %f, %f intensity : %f, r,g,b: %d, %d, %d\n", l.coordinate.x, l.coordinate.y, l.coordinate.z, l.intensity, l.rgb.r, l.rgb.g, l.rgb.b);
+	if (set_camera(splitted, &c))
+		printf("coordinate x,y,z: %f, %f, %f normalized x,y,z: %f, %f, %f fov : %d\n", c.coordinate.x, c.coordinate.y, c.coordinate.z, c.normalized.x, c.normalized.y, c.normalized.z, c.fov);
 	free_splitted(splitted);
 	return (0);
 }
