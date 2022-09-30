@@ -36,6 +36,7 @@ typedef struct s_light
 	t_rgb			rgb;
 }	t_light;
 
+
 typedef struct s_camera
 {
 	t_coordinate	coordinate;
@@ -156,6 +157,7 @@ int	set_light(char **info, t_light *l)// caller must check whether the count of 
 	return (1);
 }
 
+
 int	set_camera(char **info, t_camera *c)// caller must check whether the count of splitted is 4. and this function is called only if splitted[0] is "C"
 {
 	t_coordinate	coordinate;
@@ -213,6 +215,7 @@ int	main(int argc, char **argv)
 	// 		printf("%s\n", p); // 유효성 검사 수행하는 함수 호출
 	// 	free(p);
 	// }
+
 	char		*str1 = "C -50.0,50.0,0.0 0,0,1 70";
 	char		*str2 = "C -50.1,50.0,0.0 0,2,1 70";
 	char		*str3 = "C -50.2,50.0,0.0 0,0,1 181";
@@ -220,7 +223,6 @@ int	main(int argc, char **argv)
 	char		*str5 = "C -50.4,50.0,0.2313 0,0,1 70";
 
 
-	t_camera	c;
 	char		**splitted;
 	int			count;
 
