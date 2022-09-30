@@ -29,6 +29,13 @@ typedef struct s_ambient
 	t_rgb	rgb;
 }	t_ambient;
 
+typedef struct s_light
+{
+	t_coordinate	coordinate;
+	double			intensity;
+	t_rgb			rgb;
+}	t_light;
+
 int	check_rgb(t_rgb rgb)
 {
 	int	r;
@@ -118,6 +125,30 @@ int	set_ambient(char **info, t_ambient *a) // caller must check whether the coun
 	return (1);
 }
 
+int	set_light(char **info, t_light *l)// caller must check whether the count of splitted is 4. and this function is called only if splitted[0] is "L"
+{
+	t_coordinate	coordinate;
+	double			intensitiy;
+	t_rgb			rgb;
+
+	if (!set_coordinate(info[1], &coordinate))
+		return (0);
+	if (!get_double(info[2], &intensitiy)
+		|| intensitiy < 0 || 1 < intensitiy
+		|| !check_comma_cnt(info[2]))
+		return (0);
+	if (!set_rgb(info[3], &rgb))
+		return (0);
+	l->coordinate.x = coordinate.x;
+	l->coordinate.y = coordinate.y;
+	l->coordinate.z = coordinate.z;
+	l->intensity = intensitiy;
+	l->rgb.r = rgb.r;
+	l->rgb.g = rgb.g;
+	l->rgb.b = rgb.b;
+	return (1);
+}
+
 int	open_file(char *path)
 {
 	int	fd;
@@ -150,55 +181,36 @@ int	main(int argc, char **argv)
 	// 		printf("%s\n", p); // 유효성 검사 수행하는 함수 호출
 	// 	free(p);
 	// }
-	char		*str1 = "A 0.2 255,255,255";
-	char		*str2 = "A 0.0 255,255,255";
-	char		*str3 = "A -0.1 255,255,255";
-	char		*str4 = "A 1.2 255,255,255";
-	char		*str5 = "A 0.2 256,255,255";
-	char		*str6 = "A 0.2 255,-1,255";
-	char		*str7 = "A 0.2 255,255,4242";
-	char		*str8 = "A 0.2 1,1,1";
-	char		*str9 = "A 0.2 1, 1, 1";
+	char		*str1 = "L -40.0,50.0,0.0 0.2 10,0,255";
+	char		*str2 = "L -20.51,0.02,-0.0001 0.44 255,255,255";
+	char		*str3 = "L -40.0,50.0,0.0 2.0 10,244,255";
+	char		*str4 = "L -40.0,50.0,0.0 0.999 10,0,255";
+	char		*str5 = "L -40.0,50.0,0.0 0.2 10,0,255";
 
-	t_ambient	a;
+
+	t_light	l;
 	char		**splitted;
 	int			count;
 
 	splitted = split_line(str1, ' ', &count);
-	if (set_ambient(splitted, &a))
-		printf("intensity : %f, r,g,b: %d, %d, %d\n", a.intensity, a.rgb.r, a.rgb.g, a.rgb.b);
+	if (set_light(splitted, &l))
+		printf("coordinate x,y,z: %f, %f, %f intensity : %f, r,g,b: %d, %d, %d\n", l.coordinate.x, l.coordinate.y, l.coordinate.z, l.intensity, l.rgb.r, l.rgb.g, l.rgb.b);
 	free_splitted(splitted);
 	splitted = split_line(str2, ' ', &count);
-	if (set_ambient(splitted, &a))
-		printf("intensity : %f, r,g,b: %d, %d, %d\n", a.intensity, a.rgb.r, a.rgb.g, a.rgb.b);
+	if (set_light(splitted, &l))
+		printf("coordinate x,y,z: %f, %f, %f intensity : %f, r,g,b: %d, %d, %d\n", l.coordinate.x, l.coordinate.y, l.coordinate.z, l.intensity, l.rgb.r, l.rgb.g, l.rgb.b);
 	free_splitted(splitted);
 	splitted = split_line(str3, ' ', &count);
-	if (set_ambient(splitted, &a))
-		printf("intensity : %f, r,g,b: %d, %d, %d\n", a.intensity, a.rgb.r, a.rgb.g, a.rgb.b);
+	if (set_light(splitted, &l))
+		printf("coordinate x,y,z: %f, %f, %f intensity : %f, r,g,b: %d, %d, %d\n", l.coordinate.x, l.coordinate.y, l.coordinate.z, l.intensity, l.rgb.r, l.rgb.g, l.rgb.b);
 	free_splitted(splitted);
 	splitted = split_line(str4, ' ', &count);
-	if (set_ambient(splitted, &a))
-		printf("intensity : %f, r,g,b: %d, %d, %d\n", a.intensity, a.rgb.r, a.rgb.g, a.rgb.b);
+	if (set_light(splitted, &l))
+		printf("coordinate x,y,z: %f, %f, %f intensity : %f, r,g,b: %d, %d, %d\n", l.coordinate.x, l.coordinate.y, l.coordinate.z, l.intensity, l.rgb.r, l.rgb.g, l.rgb.b);
 	free_splitted(splitted);
 	splitted = split_line(str5, ' ', &count);
-	if (set_ambient(splitted, &a))
-		printf("intensity : %f, r,g,b: %d, %d, %d\n", a.intensity, a.rgb.r, a.rgb.g, a.rgb.b);
-	free_splitted(splitted);
-	splitted = split_line(str6, ' ', &count);
-	if (set_ambient(splitted, &a))
-		printf("intensity : %f, r,g,b: %d, %d, %d\n", a.intensity, a.rgb.r, a.rgb.g, a.rgb.b);
-	free_splitted(splitted);
-	splitted = split_line(str7, ' ', &count);
-	if (set_ambient(splitted, &a))
-		printf("intensity : %f, r,g,b: %d, %d, %d\n", a.intensity, a.rgb.r, a.rgb.g, a.rgb.b);
-	free_splitted(splitted);
-	splitted = split_line(str8, ' ', &count);
-	if (set_ambient(splitted, &a))
-		printf("intensity : %f, r,g,b: %d, %d, %d\n", a.intensity, a.rgb.r, a.rgb.g, a.rgb.b);
-	free_splitted(splitted);
-	splitted = split_line(str9, ' ', &count);
-	if (set_ambient(splitted, &a))
-		printf("intensity : %f, r,g,b: %d, %d, %d\n", a.intensity, a.rgb.r, a.rgb.g, a.rgb.b);
+	if (set_light(splitted, &l))
+		printf("coordinate x,y,z: %f, %f, %f intensity : %f, r,g,b: %d, %d, %d\n", l.coordinate.x, l.coordinate.y, l.coordinate.z, l.intensity, l.rgb.r, l.rgb.g, l.rgb.b);
 	free_splitted(splitted);
 	return (0);
 }
