@@ -287,23 +287,23 @@ int	main(int argc, char **argv)
  	splitted = split_line(str1, ' ', &count);
  	if (set_plane(splitted, &pl))
  		printf("coordinate x,y,z: %f, %f, %f normalized:%f, %f, %f RGB r,g,b: %d, %d, %d\n", pl.coordinate.x, pl.coordinate.y, pl.coordinate.z, pl.normalized.x, pl.normalized.y, pl.normalized.z, pl.rgb.r, pl.rgb.g, pl.rgb.b);
- 	free_splitted(splitted);
+ 	free_splitted(splitted,0);
  	splitted = split_line(str2, ' ', &count);
  	if (set_plane(splitted, &pl))
  		printf("coordinate x,y,z: %f, %f, %f normalized:%f, %f, %f RGB r,g,b: %d, %d, %d\n", pl.coordinate.x, pl.coordinate.y, pl.coordinate.z, pl.normalized.x, pl.normalized.y, pl.normalized.z, pl.rgb.r, pl.rgb.g, pl.rgb.b);
- 	free_splitted(splitted);
+ 	free_splitted(splitted,0);
  	splitted = split_line(str3, ' ', &count);
  	if (set_plane(splitted, &pl))
  		printf("oordinate x,y,z: %f, %f, %f normalized:%f, %f, %f RGB r,g,b: %d, %d, %d\n", pl.coordinate.x, pl.coordinate.y, pl.coordinate.z, pl.normalized.x, pl.normalized.y, pl.normalized.z, pl.rgb.r, pl.rgb.g, pl.rgb.b);
- 	free_splitted(splitted);
+ 	free_splitted(splitted,0);
  	splitted = split_line(str4, ' ', &count);
  	if (set_plane(splitted, &pl))
  		printf("oordinate x,y,z: %f, %f, %f normalized:%f, %f, %f RGB r,g,b: %d, %d, %d\n", pl.coordinate.x, pl.coordinate.y, pl.coordinate.z, pl.normalized.x, pl.normalized.y, pl.normalized.z, pl.rgb.r, pl.rgb.g, pl.rgb.b);
- 	free_splitted(splitted);
+ 	free_splitted(splitted,0);
  	splitted = split_line(str5, ' ', &count);
  	if (set_plane(splitted, &pl))
  		printf("oordinate x,y,z: %f, %f, %f normalized:%f, %f, %f RGB r,g,b: %d, %d, %d\n", pl.coordinate.x, pl.coordinate.y, pl.coordinate.z, pl.normalized.x, pl.normalized.y, pl.normalized.z, pl.rgb.r, pl.rgb.g, pl.rgb.b);
- 	free_splitted(splitted);
+ 	free_splitted(splitted,0);
 
 	return (0);
 }
