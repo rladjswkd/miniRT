@@ -18,8 +18,8 @@ static int	count_words(char const *s, char c, int *count)
 			start = end + 1;
 		}
 	}
-	*count = cnt;
-	return (cnt + (start != end));
+	*count = cnt + (start != end);
+	return (*count);
 }
 
 static char	**free_assigned(char **output, int to)
