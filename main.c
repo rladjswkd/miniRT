@@ -181,36 +181,11 @@ int	main(int argc, char **argv)
 	// 		printf("%s\n", p); // 유효성 검사 수행하는 함수 호출
 	// 	free(p);
 	// }
-	char		*str1 = "L -40.0,50.0,0.0 0.2 10,0,255";
-	char		*str2 = "L -20.51,0.02,-0.0001 0.44 255,255,255";
-	char		*str3 = "L -40.0,50.0,0.0 2.0 10,244,255";
-	char		*str4 = "L -40.0,50.0,0.0 0.999 10,0,255";
-	char		*str5 = "L -40.0,50.0,0.0 0.2 10,0,255";
-
-
-	t_light	l;
-	char		**splitted;
-	int			count;
-
-	splitted = split_line(str1, ' ', &count);
-	if (set_light(splitted, &l))
-		printf("coordinate x,y,z: %f, %f, %f intensity : %f, r,g,b: %d, %d, %d\n", l.coordinate.x, l.coordinate.y, l.coordinate.z, l.intensity, l.rgb.r, l.rgb.g, l.rgb.b);
-	free_splitted(splitted);
-	splitted = split_line(str2, ' ', &count);
-	if (set_light(splitted, &l))
-		printf("coordinate x,y,z: %f, %f, %f intensity : %f, r,g,b: %d, %d, %d\n", l.coordinate.x, l.coordinate.y, l.coordinate.z, l.intensity, l.rgb.r, l.rgb.g, l.rgb.b);
-	free_splitted(splitted);
-	splitted = split_line(str3, ' ', &count);
-	if (set_light(splitted, &l))
-		printf("coordinate x,y,z: %f, %f, %f intensity : %f, r,g,b: %d, %d, %d\n", l.coordinate.x, l.coordinate.y, l.coordinate.z, l.intensity, l.rgb.r, l.rgb.g, l.rgb.b);
-	free_splitted(splitted);
-	splitted = split_line(str4, ' ', &count);
-	if (set_light(splitted, &l))
-		printf("coordinate x,y,z: %f, %f, %f intensity : %f, r,g,b: %d, %d, %d\n", l.coordinate.x, l.coordinate.y, l.coordinate.z, l.intensity, l.rgb.r, l.rgb.g, l.rgb.b);
-	free_splitted(splitted);
-	splitted = split_line(str5, ' ', &count);
-	if (set_light(splitted, &l))
-		printf("coordinate x,y,z: %f, %f, %f intensity : %f, r,g,b: %d, %d, %d\n", l.coordinate.x, l.coordinate.y, l.coordinate.z, l.intensity, l.rgb.r, l.rgb.g, l.rgb.b);
-	free_splitted(splitted);
+	double	d;
+	int		i;
+	printf("%d\n", get_double("2", &d));
+	printf("%f\n", d);
+	printf("%d\n", get_int("3", &i));
+	printf("%d\n", i);
 	return (0);
 }
