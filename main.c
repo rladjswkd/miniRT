@@ -44,6 +44,13 @@ typedef struct s_camera
 	int				fov;
 }	t_camera;
 
+typedef struct s_plane
+{
+	t_coordinate	coordinate;
+	t_vector		normalized;
+	t_rgb			rgb;
+}	t_plane;
+
 int	check_rgb(t_rgb rgb)
 {
 	int	r;
@@ -166,7 +173,7 @@ int	set_camera(char **info, t_camera *c)// caller must check whether the count o
 	if (!set_coordinate(info[1], &coordinate))
 		return (0);
 	if (!set_coordinate(info[2], &normalized)
-		|| check_normal(normalized))
+		|| !check_normal(normalized))
 		return (0);
 	if (!get_int(info[3], &fov)
 		|| fov < 0 || 180 < fov) // 180 0
@@ -178,6 +185,31 @@ int	set_camera(char **info, t_camera *c)// caller must check whether the count o
 	c->normalized.y = normalized.y;
 	c->normalized.z = normalized.z;
 	c->fov = fov;
+	return (1);
+}
+
+int	set_plane(char **info, t_plane *pl)// caller must check whether the count of splitted is 4. and this function is called only if splitted[0] is "pl"
+{
+	t_coordinate	coordinate;
+	t_vector		normalized;
+	t_rgb			rgb;
+
+	if (!set_coordinate(info[1], &coordinate))
+		return (0);
+	if (!set_coordinate(info[2], &normalized)
+	|| !check_normal(normalized))
+		return (0);
+	if (!set_rgb(info[3], &rgb))
+		return (0);
+	pl->coordinate.x = coordinate.x;
+	pl->coordinate.y = coordinate.y;
+	pl->coordinate.z = coordinate.z;
+	pl->normalized.x = normalized.x;
+	pl->normalized.y = normalized.y;
+	pl->normalized.z = normalized.z;
+	pl->rgb.r = rgb.r;
+	pl->rgb.g = rgb.g;
+	pl->rgb.b = rgb.b;
 	return (1);
 }
 
@@ -214,12 +246,35 @@ int	main(int argc, char **argv)
 	// 	free(p);
 	// }
 
-	double	d;
-	int		i;
-	printf("%d\n", get_double("2", &d));
-	printf("%f\n", d);
-	printf("%d\n", get_int("3", &i));
-	printf("%d\n", i);
+	char		*str1 = "pl 0.0,0.0,-10.0 0.0,1.0,0.0 0,0,225";
+ 	char		*str2 = "pl 0.1,0.0,-10.0 0.0,1.0,0.0 0,0,225";
+ 	char		*str3 = "pl 0.2,0.0,-10.0 0.0,1.0,0.0 -12,0,225";
+ 	char		*str4 = "pl 0.3,0.0,-10.0 0.0,1.0,-0.0 0,0,225";
+ 	char		*str5 = "pl 0.4,0.0,-10.0 0.0,1.0,0.0 0,0,225";
 
+ 	t_plane	pl;
+ 	char		**splitted;
+ 	int			count;
+
+ 	splitted = split_line(str1, ' ', &count);
+ 	if (set_plane(splitted, &pl))
+ 		printf("coordinate x,y,z: %f, %f, %f normalized:%f, %f, %f RGB r,g,b: %d, %d, %d\n", pl.coordinate.x, pl.coordinate.y, pl.coordinate.z, pl.normalized.x, pl.normalized.y, pl.normalized.z, pl.rgb.r, pl.rgb.g, pl.rgb.b);
+ 	free_splitted(splitted);
+ 	splitted = split_line(str2, ' ', &count);
+ 	if (set_plane(splitted, &pl))
+ 		printf("coordinate x,y,z: %f, %f, %f normalized:%f, %f, %f RGB r,g,b: %d, %d, %d\n", pl.coordinate.x, pl.coordinate.y, pl.coordinate.z, pl.normalized.x, pl.normalized.y, pl.normalized.z, pl.rgb.r, pl.rgb.g, pl.rgb.b);
+ 	free_splitted(splitted);
+ 	splitted = split_line(str3, ' ', &count);
+ 	if (set_plane(splitted, &pl))
+ 		printf("oordinate x,y,z: %f, %f, %f normalized:%f, %f, %f RGB r,g,b: %d, %d, %d\n", pl.coordinate.x, pl.coordinate.y, pl.coordinate.z, pl.normalized.x, pl.normalized.y, pl.normalized.z, pl.rgb.r, pl.rgb.g, pl.rgb.b);
+ 	free_splitted(splitted);
+ 	splitted = split_line(str4, ' ', &count);
+ 	if (set_plane(splitted, &pl))
+ 		printf("oordinate x,y,z: %f, %f, %f normalized:%f, %f, %f RGB r,g,b: %d, %d, %d\n", pl.coordinate.x, pl.coordinate.y, pl.coordinate.z, pl.normalized.x, pl.normalized.y, pl.normalized.z, pl.rgb.r, pl.rgb.g, pl.rgb.b);
+ 	free_splitted(splitted);
+ 	splitted = split_line(str5, ' ', &count);
+ 	if (set_plane(splitted, &pl))
+ 		printf("oordinate x,y,z: %f, %f, %f normalized:%f, %f, %f RGB r,g,b: %d, %d, %d\n", pl.coordinate.x, pl.coordinate.y, pl.coordinate.z, pl.normalized.x, pl.normalized.y, pl.normalized.z, pl.rgb.r, pl.rgb.g, pl.rgb.b);
+ 	free_splitted(splitted);
 	return (0);
 }
