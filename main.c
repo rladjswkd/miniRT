@@ -44,6 +44,13 @@ typedef struct s_camera
 	int				fov;
 }	t_camera;
 
+typedef struct s_sphere
+{
+	t_coordinate	coordinate;
+	double			diameter;
+	t_rgb			rgb;
+}	t_sphere;
+
 int	check_rgb(t_rgb rgb)
 {
 	int	r;
@@ -179,6 +186,29 @@ int	set_camera(char **info, t_camera *c)// caller must check whether the count o
 	return (1);
 }
 
+int	set_sphere(char **info, t_sphere *sp)// caller must check whether the count of splitted is 4. and this function is called only if splitted[0] is "sp"
+{
+	t_coordinate	coordinate;
+	double			diameter;
+	t_rgb			rgb;
+
+	if (!set_coordinate(info[1], &coordinate))
+		return (0);
+	if (!get_double(info[2], &diameter)
+		|| diameter < 0)
+		return (0);
+	if (!set_rgb(info[3], &rgb))
+		return (0);
+	sp->coordinate.x = coordinate.x;
+	sp->coordinate.y = coordinate.y;
+	sp->coordinate.z = coordinate.z;
+	sp->diameter = diameter;
+	sp->rgb.r = rgb.r;
+	sp->rgb.g = rgb.g;
+	sp->rgb.b = rgb.b;
+	return (1);
+}
+
 int	open_file(char *path)
 {
 	int	fd;
@@ -212,12 +242,35 @@ int	main(int argc, char **argv)
 	// 	free(p);
 	// }
 
-	double	d;
-	int		i;
-	printf("%d\n", get_double("2", &d));
-	printf("%f\n", d);
-	printf("%d\n", get_int("3", &i));
-	printf("%d\n", i);
+	char		*str1 = "sp 50.0,0.0,20.6 12.6 10,0,255";
+	char		*str2 = "sp 0.1,0.0,20.6 -1 10,0,255";
+	char		*str3 = "sp 0.2,0.0,20.6 120.12 10,0,255";
+	char		*str4 = "sp 50.3,2.0,20.6 70 10,11,244";
+	char		*str5 = "sp -50.4,50.0,0.2313 2170.3 0,0,22";
 
+	t_sphere	sp;
+	char		**splitted;
+	int			count;
+
+	splitted = split_line(str1, ' ', &count);
+	if (set_sphere(splitted, &sp))
+		printf("coordinate x,y,z: %f, %f, %f diameter: %f RGB r,g,b: %d, %d, %d\n", sp.coordinate.x, sp.coordinate.y, sp.coordinate.z, sp.diameter, sp.rgb.r, sp.rgb.g, sp.rgb.b);
+	free_splitted(splitted);
+	splitted = split_line(str2, ' ', &count);
+	if (set_sphere(splitted, &sp))
+		printf("coordinate x,y,z: %f, %f, %f diameter: %f RGB r,g,b: %d, %d, %d\n", sp.coordinate.x, sp.coordinate.y, sp.coordinate.z, sp.diameter, sp.rgb.r, sp.rgb.g, sp.rgb.b);
+	free_splitted(splitted);
+	splitted = split_line(str3, ' ', &count);
+	if (set_sphere(splitted, &sp))
+		printf("coordinate x,y,z: %f, %f, %f diameter: %f RGB r,g,b: %d, %d, %d\n", sp.coordinate.x, sp.coordinate.y, sp.coordinate.z, sp.diameter, sp.rgb.r, sp.rgb.g, sp.rgb.b);
+	free_splitted(splitted);
+	splitted = split_line(str4, ' ', &count);
+	if (set_sphere(splitted, &sp))
+		printf("coordinate x,y,z: %f, %f, %f diameter: %f RGB r,g,b: %d, %d, %d\n", sp.coordinate.x, sp.coordinate.y, sp.coordinate.z, sp.diameter, sp.rgb.r, sp.rgb.g, sp.rgb.b);
+	free_splitted(splitted);
+	splitted = split_line(str5, ' ', &count);
+	if (set_sphere(splitted, &sp))
+		printf("coordinate x,y,z: %f, %f, %f diameter: %f RGB r,g,b: %d, %d, %d\n", sp.coordinate.x, sp.coordinate.y, sp.coordinate.z, sp.diameter, sp.rgb.r, sp.rgb.g, sp.rgb.b);
+	free_splitted(splitted);
 	return (0);
 }
