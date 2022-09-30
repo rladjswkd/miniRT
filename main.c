@@ -142,8 +142,7 @@ int	set_light(char **info, t_light *l)// caller must check whether the count of 
 	if (!set_coordinate(info[1], &coordinate))
 		return (0);
 	if (!get_double(info[2], &intensitiy)
-		|| intensitiy < 0 || 1 < intensitiy
-		|| !check_comma_cnt(info[2]))
+		|| intensitiy < 0 || 1 < intensitiy)
 		return (0);
 	if (!set_rgb(info[3], &rgb))
 		return (0);
@@ -170,8 +169,7 @@ int	set_camera(char **info, t_camera *c)// caller must check whether the count o
 		|| check_normal(normalized))
 		return (0);
 	if (!get_int(info[3], &fov)
-		|| fov < 0 || 180 < fov
-		|| !check_comma_cnt(info[3]))
+		|| fov < 0 || 180 < fov) // 180 0
 		return (0);
 	c->coordinate.x = coordinate.x;
 	c->coordinate.y = coordinate.y;
