@@ -4,6 +4,7 @@
 #include "string_utils.h"
 #include "parser_util_split.h"
 #include <math.h>
+#include "converter.h"
 
 typedef struct s_rgb
 {
@@ -78,12 +79,71 @@ int	main(int argc, char **argv)
 	// 		printf("%s\n", p); // 유효성 검사 수행하는 함수 호출
 	// 	free(p);
 	// }
-	t_vector	vec1 = {1.0, 0.0, 0.0};
-	t_vector	vec2 = {0.9, 0.0, 0.0};
-	t_vector	vec3 = {8.0 / 9, -1.0 / 9, 4.0 / 9};
+	int		i;
+	double	d;
 
-	printf("%d\n", check_normal(vec1));
-	printf("%d\n", check_normal(vec2));
-	printf("%d\n", check_normal(vec3));
+	printf("%d\n", get_int("-2147483648.0", &i));
+	printf("%d\n", i);
+	printf("\n");
+	printf("%d\n", get_int("-2147483-", &i));
+	printf("%d\n", i);
+	printf("\n");
+	printf("%d\n", get_int("-2147483649", &i));
+	printf("%d\n", i);
+	printf("\n");
+	printf("%d\n", get_int("-2147483648", &i));
+	printf("%d\n", i);
+	printf("\n");
+	printf("%d\n", get_int("-1", &i));
+	printf("%d\n", i);
+	printf("\n");
+	printf("%d\n", get_int("0", &i));
+	printf("%d\n", i);
+	printf("\n");
+	printf("%d\n", get_int("1", &i));
+	printf("%d\n", i);
+	printf("\n");
+	printf("%d\n", get_int("2147483647", &i));
+	printf("%d\n", i);
+	printf("\n");
+	printf("%d\n", get_int("2147483648", &i));
+	printf("%d\n", i);
+	printf("\n");
+	printf("%d\n", get_double("-2147483648.0", &d));
+	printf("%f\n", d);
+	printf("\n");
+	printf("%d\n", get_double("-1.0", &d));
+	printf("%f\n", d);
+	printf("\n");
+	printf("%d\n", get_double("-1", &d));
+	printf("%f\n", d);
+	printf("\n");
+	printf("%d\n", get_double("0.0", &d));
+	printf("%f\n", d);
+	printf("\n");
+	printf("%d\n", get_double("0", &d));
+	printf("%f\n", d);
+	printf("\n");
+	printf("%d\n", get_double("1.0", &d));
+	printf("%f\n", d);
+	printf("\n");
+	printf("%d\n", get_double("1", &d));
+	printf("%f\n", d);
+	printf("\n");
+	printf("%d\n", get_double("1.", &d));
+	printf("%f\n", d);
+	printf("\n");
+	printf("%d\n", get_double("0.1", &d));
+	printf("%f\n", d);
+	printf("\n");
+	printf("%d\n", get_double(".1", &d));
+	printf("%f\n", d);
+	printf("\n");
+	printf("%d\n", get_double("0.999999", &d));
+	printf("%f\n", d);
+	printf("\n");
+	printf("%d\n", get_double("2147483647.234567", &d));
+	printf("%f\n", d);
+
 	return (0);
 }
