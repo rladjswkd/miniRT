@@ -58,6 +58,15 @@ typedef struct s_plane
 	t_rgb			rgb;
 }	t_plane;
 
+typedef struct s_cylinder
+{
+	t_coordinate	coordinate;
+	t_vector		normalized;
+	double			diameter;
+	double			height;
+	t_rgb			rgb;
+}	t_cylinder;
+
 int	check_rgb(t_rgb rgb)
 {
 	int	r;
@@ -241,6 +250,34 @@ int	set_sphere(char **info, t_sphere *sp)// caller must check whether the count 
 	return (1);
 }
 
+int	set_cylinder(char **info, t_cylinder *cy)// caller must check whether the count of splitted is 6. and this function is called only if splitted[0] is "cy"
+{
+	t_coordinate	coordinate;
+	t_vector		v;
+	double			diameter;
+	double			height;
+	t_rgb			rgb;
+
+	if (!set_coordinate(info[1], &coordinate) || !set_coordinate(info[2], &v))
+		return (0);
+	if (!check_normal(v) || !get_double(info[3], &diameter) || diameter < 0)
+		return (0);
+	if (!get_double(info[4], &height) || height < 0 || !set_rgb(info[5], &rgb))
+		return (0);
+	cy->coordinate.x = coordinate.x;
+	cy->coordinate.y = coordinate.y;
+	cy->coordinate.z = coordinate.z;
+	cy->normalized.x = v.x;
+	cy->normalized.y = v.y;
+	cy->normalized.z = v.z;
+	cy->diameter = diameter;
+	cy->height = height;
+	cy->rgb.r = rgb.r;
+	cy->rgb.g = rgb.g;
+	cy->rgb.b = rgb.b;
+	return (1);
+}
+
 int	open_file(char *path)
 {
 	int	fd;
@@ -274,36 +311,27 @@ int	main(int argc, char **argv)
 	// 	free(p);
 	// }
 
-	char		*str1 = "pl 0.0,0.0,-10.0 0.0,1.0,0.0 0,0,225";
- 	char		*str2 = "pl 0.1,0.0,-10.0 0.0,1.0,0.0 0,0,225";
- 	char		*str3 = "pl 0.2,0.0,-10.0 0.0,1.0,0.0 -12,0,225";
- 	char		*str4 = "pl 0.3,0.0,-10.0 0.0,1.0,-0.0 0,0,225";
- 	char		*str5 = "pl 0.4,0.0,-10.0 0.0,1.0,0.0 0,0,225";
+	char		*str1 = "cy 50.0,0.0,20.6 0.0,0.0,1.0 14.2 21.42 10,0,255";
+	char		*str2 = "cy 50.0,0.0,20.6 0.0,0.0,1.0 14.2 21.42 10,0,255";
+	char		*str3 = "cy 50.0,0.0,20.6 0.0,0.0,1.0 14.2 21.42 10,0,255";
 
- 	t_plane	pl;
- 	char		**splitted;
- 	int			count;
 
- 	splitted = split_line(str1, ' ', &count);
- 	if (set_plane(splitted, &pl))
- 		printf("coordinate x,y,z: %f, %f, %f normalized:%f, %f, %f RGB r,g,b: %d, %d, %d\n", pl.coordinate.x, pl.coordinate.y, pl.coordinate.z, pl.normalized.x, pl.normalized.y, pl.normalized.z, pl.rgb.r, pl.rgb.g, pl.rgb.b);
- 	free_splitted(splitted,0);
- 	splitted = split_line(str2, ' ', &count);
- 	if (set_plane(splitted, &pl))
- 		printf("coordinate x,y,z: %f, %f, %f normalized:%f, %f, %f RGB r,g,b: %d, %d, %d\n", pl.coordinate.x, pl.coordinate.y, pl.coordinate.z, pl.normalized.x, pl.normalized.y, pl.normalized.z, pl.rgb.r, pl.rgb.g, pl.rgb.b);
- 	free_splitted(splitted,0);
- 	splitted = split_line(str3, ' ', &count);
- 	if (set_plane(splitted, &pl))
- 		printf("oordinate x,y,z: %f, %f, %f normalized:%f, %f, %f RGB r,g,b: %d, %d, %d\n", pl.coordinate.x, pl.coordinate.y, pl.coordinate.z, pl.normalized.x, pl.normalized.y, pl.normalized.z, pl.rgb.r, pl.rgb.g, pl.rgb.b);
- 	free_splitted(splitted,0);
- 	splitted = split_line(str4, ' ', &count);
- 	if (set_plane(splitted, &pl))
- 		printf("oordinate x,y,z: %f, %f, %f normalized:%f, %f, %f RGB r,g,b: %d, %d, %d\n", pl.coordinate.x, pl.coordinate.y, pl.coordinate.z, pl.normalized.x, pl.normalized.y, pl.normalized.z, pl.rgb.r, pl.rgb.g, pl.rgb.b);
- 	free_splitted(splitted,0);
- 	splitted = split_line(str5, ' ', &count);
- 	if (set_plane(splitted, &pl))
- 		printf("oordinate x,y,z: %f, %f, %f normalized:%f, %f, %f RGB r,g,b: %d, %d, %d\n", pl.coordinate.x, pl.coordinate.y, pl.coordinate.z, pl.normalized.x, pl.normalized.y, pl.normalized.z, pl.rgb.r, pl.rgb.g, pl.rgb.b);
- 	free_splitted(splitted,0);
+	t_cylinder	cy;
+	char		**splitted;
+	int			count;
+
+	splitted = split_line(str1, ' ', &count);
+	if (set_cylinder(splitted, &cy))
+		printf("coordinate x,y,z: %f, %f, %f  normalized x,y,z: %f %f %f \ndiameter: %f height:%f RGB r,g,b: %d, %d, %d\n", cy.coordinate.x, cy.coordinate.y, cy.coordinate.z, cy.normalized.x, cy.normalized.y, cy.normalized.z, cy.diameter, cy.height, cy.rgb.r, cy.rgb.g, cy.rgb.b);
+	free_splitted(splitted,0);
+	splitted = split_line(str2, ' ', &count);
+	if (set_cylinder(splitted, &cy))
+		printf("coordinate x,y,z: %f, %f, %f  normalized x,y,z: %f %f %f \ndiameter: %f height:%f RGB r,g,b: %d, %d, %d\n", cy.coordinate.x, cy.coordinate.y, cy.coordinate.z, cy.normalized.x, cy.normalized.y, cy.normalized.z, cy.diameter, cy.height, cy.rgb.r, cy.rgb.g, cy.rgb.b);
+	free_splitted(splitted,0);
+	splitted = split_line(str3, ' ', &count);
+	if (set_cylinder(splitted, &cy))
+		printf("coordinate x,y,z: %f, %f, %f  normalized x,y,z: %f %f %f \ndiameter: %f height:%f RGB r,g,b: %d, %d, %d\n", cy.coordinate.x, cy.coordinate.y, cy.coordinate.z, cy.normalized.x, cy.normalized.y, cy.normalized.z, cy.diameter, cy.height, cy.rgb.r, cy.rgb.g, cy.rgb.b);
+	free_splitted(splitted,0);
 
 	return (0);
 }
