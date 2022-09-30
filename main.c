@@ -121,6 +121,7 @@ int	set_ambient(char **info, t_ambient *a) // caller must check whether the coun
 
 	if (!get_double(info[1], &intensity)
 		|| intensity < 0 || 1 < intensity)
+		return (0);
 	if (!set_rgb(info[2], &rgb))
 		return (0);
 	a->intensity = intensity;
