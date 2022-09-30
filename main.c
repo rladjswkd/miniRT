@@ -36,6 +36,14 @@ typedef struct s_light
 	t_rgb			rgb;
 }	t_light;
 
+
+typedef struct s_camera
+{
+	t_coordinate	coordinate;
+	t_vector		normalized;
+	int				fov;
+}	t_camera;
+
 int	check_rgb(t_rgb rgb)
 {
 	int	r;
@@ -134,8 +142,7 @@ int	set_light(char **info, t_light *l)// caller must check whether the count of 
 	if (!set_coordinate(info[1], &coordinate))
 		return (0);
 	if (!get_double(info[2], &intensitiy)
-		|| intensitiy < 0 || 1 < intensitiy
-		|| !check_comma_cnt(info[2]))
+		|| intensitiy < 0 || 1 < intensitiy)
 		return (0);
 	if (!set_rgb(info[3], &rgb))
 		return (0);
@@ -146,6 +153,31 @@ int	set_light(char **info, t_light *l)// caller must check whether the count of 
 	l->rgb.r = rgb.r;
 	l->rgb.g = rgb.g;
 	l->rgb.b = rgb.b;
+	return (1);
+}
+
+
+int	set_camera(char **info, t_camera *c)// caller must check whether the count of splitted is 4. and this function is called only if splitted[0] is "C"
+{
+	t_coordinate	coordinate;
+	t_vector		normalized;
+	int				fov;
+
+	if (!set_coordinate(info[1], &coordinate))
+		return (0);
+	if (!set_coordinate(info[2], &normalized)
+		|| check_normal(normalized))
+		return (0);
+	if (!get_int(info[3], &fov)
+		|| fov < 0 || 180 < fov) // 180 0
+		return (0);
+	c->coordinate.x = coordinate.x;
+	c->coordinate.y = coordinate.y;
+	c->coordinate.z = coordinate.z;
+	c->normalized.x = normalized.x;
+	c->normalized.y = normalized.y;
+	c->normalized.z = normalized.z;
+	c->fov = fov;
 	return (1);
 }
 
@@ -181,11 +213,13 @@ int	main(int argc, char **argv)
 	// 		printf("%s\n", p); // 유효성 검사 수행하는 함수 호출
 	// 	free(p);
 	// }
+
 	double	d;
 	int		i;
 	printf("%d\n", get_double("2", &d));
 	printf("%f\n", d);
 	printf("%d\n", get_int("3", &i));
 	printf("%d\n", i);
+
 	return (0);
 }
