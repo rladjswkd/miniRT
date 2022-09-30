@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include "get_next_line.h"
+#include "string_utils.h"
+#include "parser_util_split.h"
 
 typedef struct	s_rgb
 {
@@ -21,22 +23,13 @@ int	check_rgb(t_rgb rgb)
 	return (-1 < r && r < 256 && -1 < g && g < 256 && -1 < b && b < 256);
 }
 
-int	get_len(char *str)
-{
-	int	len;
-
-	while (str[len])
-		len++;
-	return (len);
-}
-
 int	open_file(char *path)
 {
 	int	fd;
 	int	len;
 
 	fd = -1;
-	len = get_len(path);
+	len = ft_strlen(path);
 	if (path[len - 3] == '.' && path[len - 2] == 'r' && path[len - 1] == 't')
 		fd = open(path, O_RDONLY); // is read-only enough?
 	// call error handling function to exit.
@@ -62,16 +55,16 @@ int	main(int argc, char **argv)
 	// 		printf("%s\n", p); // 유효성 검사 수행하는 함수 호출
 	// 	free(p);
 	// }
-	t_rgb	rgb1 = {0, 0, 0};
-	t_rgb	rgb2 = {-1, 0, 0};
-	t_rgb	rgb3 = {255, 255, 255};
-	t_rgb	rgb4 = {0, 0, 256};
-	t_rgb	rgb5 = {255, 9999999999999999999, 255}; // can be ok if overflow-ed value of 999... is valid for int.
-
-	printf("%d\n", check_rgb(rgb1));
-	printf("%d\n", check_rgb(rgb2));
-	printf("%d\n", check_rgb(rgb3));
-	printf("%d\n", check_rgb(rgb4));
-	printf("%d\n", check_rgb(rgb5));
+	int		count;
+	char	**splitted = split_line("123,,,,321,,,,12,,,321,54,", ',', &count);
+	int		i = 0;
+	printf("%d\n", count);
+	while (splitted[i])
+	{
+		printf("%s\n", splitted[i]);
+		free(splitted[i]);
+		i++;
+	}
+	free(splitted);
 	return (0);
 }
