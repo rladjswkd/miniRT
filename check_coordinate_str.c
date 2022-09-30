@@ -2,7 +2,7 @@
 
 int	check_coordinate_str(char *s)
 {
-	int	i;
+	int		i;
 	char	c;
 
 	i = 0;
