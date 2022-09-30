@@ -11,14 +11,13 @@ static int	get_sign(char **str)
 
 int	get_double(char *str, double *converted)
 {
-	double	ret;
 	double	scale;
     int		sign;
 
 	sign = get_sign(&str);
-	ret = 0;
+	*converted = 0;
 	while (47 < *str && *str < 58)
-		ret = ret * 10 + sign * (*(str++) - 48);
+		*converted = *converted * 10 + sign * (*(str++) - 48);
 	if (*str != '.' && *str != '\0')
 		return (0);
 	if (*str == '\0')
@@ -27,12 +26,11 @@ int	get_double(char *str, double *converted)
 	scale = 10;
 	while (47 < *str && *str < 58)
 	{
-		ret += sign * (*(str++) - 48) / scale;
+		*converted += sign * (*(str++) - 48) / scale;
 		scale *= 10;
 	}
 	if (*str != '\0')
 		return (0);
-	*converted = ret;
 	return (1);
 }
 

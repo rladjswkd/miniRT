@@ -214,35 +214,12 @@ int	main(int argc, char **argv)
 	// 	free(p);
 	// }
 
-	char		*str1 = "C -50.0,50.0,0.0 0,0,1 70";
-	char		*str2 = "C -50.1,50.0,0.0 0,2,1 70";
-	char		*str3 = "C -50.2,50.0,0.0 0,0,1 181";
-	char		*str4 = "C -50.3,50.0,0.0 0,0,1 70";
-	char		*str5 = "C -50.4,50.0,0.2313 0,0,1 70";
+	double	d;
+	int		i;
+	printf("%d\n", get_double("2", &d));
+	printf("%f\n", d);
+	printf("%d\n", get_int("3", &i));
+	printf("%d\n", i);
 
-
-	char		**splitted;
-	int			count;
-
-	splitted = split_line(str1, ' ', &count);
-	if (set_camera(splitted, &c))
-		printf("coordinate x,y,z: %f, %f, %f normalized x,y,z: %f, %f, %f fov : %d\n", c.coordinate.x, c.coordinate.y, c.coordinate.z, c.normalized.x, c.normalized.y, c.normalized.z, c.fov);
-	free_splitted(splitted);
-	splitted = split_line(str2, ' ', &count);
-	if (set_camera(splitted, &c))
-		printf("coordinate x,y,z: %f, %f, %f normalized x,y,z: %f, %f, %f fov : %d\n", c.coordinate.x, c.coordinate.y, c.coordinate.z, c.normalized.x, c.normalized.y, c.normalized.z, c.fov);
-	free_splitted(splitted);
-	splitted = split_line(str3, ' ', &count);
-	if (set_camera(splitted, &c))
-		printf("coordinate x,y,z: %f, %f, %f normalized x,y,z: %f, %f, %f fov : %d\n", c.coordinate.x, c.coordinate.y, c.coordinate.z, c.normalized.x, c.normalized.y, c.normalized.z, c.fov);
-	free_splitted(splitted);
-	splitted = split_line(str4, ' ', &count);
-	if (set_camera(splitted, &c))
-		printf("coordinate x,y,z: %f, %f, %f normalized x,y,z: %f, %f, %f fov : %d\n", c.coordinate.x, c.coordinate.y, c.coordinate.z, c.normalized.x, c.normalized.y, c.normalized.z, c.fov);
-	free_splitted(splitted);
-	splitted = split_line(str5, ' ', &count);
-	if (set_camera(splitted, &c))
-		printf("coordinate x,y,z: %f, %f, %f normalized x,y,z: %f, %f, %f fov : %d\n", c.coordinate.x, c.coordinate.y, c.coordinate.z, c.normalized.x, c.normalized.y, c.normalized.z, c.fov);
-	free_splitted(splitted);
 	return (0);
 }
