@@ -44,6 +44,13 @@ typedef struct s_camera
 	int				fov;
 }	t_camera;
 
+typedef struct s_sphere
+{
+	t_coordinate	coordinate;
+	double			diameter;
+	t_rgb			rgb;
+}	t_sphere;
+
 typedef struct s_plane
 {
 	t_coordinate	coordinate;
@@ -76,7 +83,7 @@ int	check_normal(t_vector vec)
 		&& sqrt(x * x + y * y + z * z) == 1);
 }
 
-void	free_splitted(char **splitted)
+int	free_splitted(char **splitted, int ret)
 {
 	int	i;
 
@@ -84,6 +91,7 @@ void	free_splitted(char **splitted)
 	while (splitted[++i])
 		free(splitted[i]);
 	free(splitted);
+	return (ret);
 }
 
 int	set_rgb(char *rgb_str, t_rgb *rgb)
@@ -98,11 +106,10 @@ int	set_rgb(char *rgb_str, t_rgb *rgb)
 		|| !get_int(rgb_info[0], &(rgb->r))
 		|| !get_int(rgb_info[1], &(rgb->g))
 		|| !get_int(rgb_info[2], &(rgb->b)))
-		return (0);
-	free_splitted(rgb_info);
+		return (free_splitted(rgb_info, 0));
 	if (!check_rgb(*rgb))
-		return (0);
-	return (1);
+		return (free_splitted(rgb_info, 0));
+	return (free_splitted(rgb_info, 1));
 }
 
 int	set_coordinate(char *coord_str, t_coordinate *coord)
@@ -117,9 +124,8 @@ int	set_coordinate(char *coord_str, t_coordinate *coord)
 		|| !get_double(coord_info[0], &(coord->x))
 		|| !get_double(coord_info[1], &(coord->y))
 		|| !get_double(coord_info[2], &(coord->z)))
-		return (0);
-	free_splitted(coord_info);
-	return (1);
+		return (free_splitted(coord_info, 0));
+	return (free_splitted(coord_info, 1));
 }
 
 int	set_ambient(char **info, t_ambient *a) // caller must check whether the count of splitted is 3. and this function is called only if splitted[0] is "A"
@@ -128,8 +134,7 @@ int	set_ambient(char **info, t_ambient *a) // caller must check whether the coun
 	t_rgb	rgb;
 
 	if (!get_double(info[1], &intensity)
-		|| intensity < 0 || 1 < intensity
-		|| !check_comma_cnt(info[2]))
+		|| intensity < 0 || 1 < intensity)
 		return (0);
 	if (!set_rgb(info[2], &rgb))
 		return (0);
@@ -192,11 +197,11 @@ int	set_plane(char **info, t_plane *pl)// caller must check whether the count of
 {
 	t_coordinate	coordinate;
 	t_vector		normalized;
-	t_rgb			rgb;
+  t_rgb			rgb;
 
 	if (!set_coordinate(info[1], &coordinate))
 		return (0);
-	if (!set_coordinate(info[2], &normalized)
+  if (!set_coordinate(info[2], &normalized)
 	|| !check_normal(normalized))
 		return (0);
 	if (!set_rgb(info[3], &rgb))
@@ -210,6 +215,29 @@ int	set_plane(char **info, t_plane *pl)// caller must check whether the count of
 	pl->rgb.r = rgb.r;
 	pl->rgb.g = rgb.g;
 	pl->rgb.b = rgb.b;
+  return (1);
+}
+
+int	set_sphere(char **info, t_sphere *sp)// caller must check whether the count of splitted is 4. and this function is called only if splitted[0] is "sp"
+{
+	t_coordinate	coordinate;
+	double			diameter;
+  t_rgb			rgb;
+
+	if (!set_coordinate(info[1], &coordinate))
+		return (0);
+	if (!get_double(info[2], &diameter)
+		|| diameter < 0)
+		return (0);
+	if (!set_rgb(info[3], &rgb))
+		return (0);
+	sp->coordinate.x = coordinate.x;
+	sp->coordinate.y = coordinate.y;
+	sp->coordinate.z = coordinate.z;
+	sp->diameter = diameter;
+	sp->rgb.r = rgb.r;
+	sp->rgb.g = rgb.g;
+	sp->rgb.b = rgb.b;
 	return (1);
 }
 
@@ -276,5 +304,6 @@ int	main(int argc, char **argv)
  	if (set_plane(splitted, &pl))
  		printf("oordinate x,y,z: %f, %f, %f normalized:%f, %f, %f RGB r,g,b: %d, %d, %d\n", pl.coordinate.x, pl.coordinate.y, pl.coordinate.z, pl.normalized.x, pl.normalized.y, pl.normalized.z, pl.rgb.r, pl.rgb.g, pl.rgb.b);
  	free_splitted(splitted);
+
 	return (0);
 }
