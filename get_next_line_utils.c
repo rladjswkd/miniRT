@@ -16,7 +16,7 @@ int	find_new_line(char *data, int start, int len)
 	int	i;
 
 	i = start;
-	while (data[i] != '\n' && i < start + len)
+	while (i < start + len && data[i] != '\n')
 		i++;
 	if (i == start + len)
 		return (-1);

@@ -6,7 +6,10 @@
 #include <math.h>
 #include "converter.h"
 #include "checker.h"
-
+/*
+find_new_line에서 data에 접근하기 전에 인덱스 범위 체크를 먼저 수행해 invalid read 관련 이슈 제거
+alloc_new_node에서 새로운 node를 동적 할당할 때, next 포인터의 값을 널로 초기화하는 코드 추가
+*/
 typedef struct s_rgb
 {
 	int	r;
@@ -310,6 +313,7 @@ int	alloc_new_node(t_node **node, int index)
 	*node = (t_node *)malloc(sizeof(t_node));
 	if (!(*node))
 		return (0);
+	(*node)->next = 0;
 	if (!(*allocator[index - 3])(&((*node)->data)))
 	{
 		free(*node);
@@ -382,14 +386,10 @@ int	set_rt_info(char *line, t_rt_info *rt, int *mask)
 	if (index < 3 && (*mask & 1 << index || !(*fp[index])(splitted, cnt, rt))) // A, C, L shouldn't be on mutiple lines and don't need malloc.
 		return (free_splitted(splitted, 0));
 	*mask |= 1 << index;
-	// t_node 동적 할당, index에 맞는 오브젝트의 구조체 동적 할당, 할당한 것들을 index에 해당하는 t_rt_info 구조체의 멤버에 할당하는 함수 필요.
-	// set_{sp, pl, cy}에서 t_rt_info 구조체 내의 sp, pl, cy 노드 중 가장 마지막 노드를 가져와서 그 노드의 data에 대해 작업하는 코드 필요.
-	// fp가 0을 반환하면 위에 할당한 것들을 모두 해제하는 함수 필요.
-	// 이 부분에 해당하는 내용을 아예 함수 하나로 빼자.
 	if (2 < index
 		&& (!set_object_list(rt, index)	|| !(*fp[index])(splitted, cnt, rt)))
 		return (free_splitted(splitted, 0));
-	return (1);
+	return (free_splitted(splitted, 1));
 }
 
 int	open_file(char *path)
@@ -443,5 +443,9 @@ int	main(int argc, char **argv)
 		printf("%s\n", "valid format");
 	else
 		printf("%s\n", "invalid format");
+	/* draw image */
+	clear_list(&(rt_info.sp));
+	clear_list(&(rt_info.pl));
+	clear_list(&(rt_info.cy));
 	return (0);
 }
