@@ -392,6 +392,44 @@ int	set_rt_info(char *line, t_rt_info *rt, int *mask)
 	return (free_splitted(splitted, 1));
 }
 
+t_vector	vec_add(t_vector v1, t_vector v2)
+{
+	t_vector	ret;
+
+	ret.x = v1.x + v2.x;
+	ret.y = v1.y + v2.y;
+	ret.z = v1.z + v2.z;
+	return (ret);
+}
+
+t_vector	vec_sub(t_vector v1, t_vector v2)
+{
+	t_vector	ret;
+
+	ret.x = v1.x - v2.x;
+	ret.y = v1.y - v2.y;
+	ret.z = v1.z - v2.z;
+	return (ret);
+}
+
+t_vector	vec_scale(t_vector vec, double scalar)
+{
+	vec.x *= scalar;
+	vec.y *= scalar;
+	vec.z *= scalar;
+	return (vec);
+}
+
+double	vec_dot(t_vector v1, t_vector v2)
+{
+	return (v1.x * v2.x + v1.y * v2.y + v1.z * v2.z);
+}
+
+double	vec_magnitude(t_vector vec)
+{
+	return (sqrt(vec_dot(vec, vec)));
+}
+
 int	open_file(char *path)
 {
 	int	fd;
