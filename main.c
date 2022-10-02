@@ -6,10 +6,7 @@
 #include <math.h>
 #include "converter.h"
 #include "checker.h"
-/*
-find_new_line에서 data에 접근하기 전에 인덱스 범위 체크를 먼저 수행해 invalid read 관련 이슈 제거
-alloc_new_node에서 새로운 node를 동적 할당할 때, next 포인터의 값을 널로 초기화하는 코드 추가
-*/
+
 typedef struct s_rgb
 {
 	int	r;
@@ -85,6 +82,12 @@ typedef struct s_rt_info
 	t_node		*cy;
 	t_node		*pl;
 }	t_rt_info;
+
+typedef struct s_object
+{
+	int		type;
+	void	*object;
+}	t_object;
 
 int	check_rgb(t_rgb rgb)
 {
@@ -390,6 +393,54 @@ int	set_rt_info(char *line, t_rt_info *rt, int *mask)
 		&& (!set_object_list(rt, index)	|| !(*fp[index])(splitted, cnt, rt)))
 		return (free_splitted(splitted, 0));
 	return (free_splitted(splitted, 1));
+}
+
+t_vector	vec_add(t_vector v1, t_vector v2)
+{
+	t_vector	ret;
+
+	ret.x = v1.x + v2.x;
+	ret.y = v1.y + v2.y;
+	ret.z = v1.z + v2.z;
+	return (ret);
+}
+
+t_vector	vec_sub(t_vector v1, t_vector v2)
+{
+	t_vector	ret;
+
+	ret.x = v1.x - v2.x;
+	ret.y = v1.y - v2.y;
+	ret.z = v1.z - v2.z;
+	return (ret);
+}
+
+t_vector	vec_scale(t_vector vec, double scalar)
+{
+	vec.x *= scalar;
+	vec.y *= scalar;
+	vec.z *= scalar;
+	return (vec);
+}
+
+double	vec_dot(t_vector v1, t_vector v2)
+{
+	return (v1.x * v2.x + v1.y * v2.y + v1.z * v2.z);
+}
+
+t_vector	vec_cross(t_vector v1, t_vector v2)
+{
+	t_vector	ret;
+
+	ret.x = v1.y * v2.z - v1.z * v2.y;
+	ret.y = v1.z * v2.x - v1.x * v2.z;
+	ret.z = v1.x * v2.y - v1.y * v2.x;
+	return (ret);
+}
+
+double	vec_magnitude(t_vector vec)
+{
+	return (sqrt(vec_dot(vec, vec)));
 }
 
 int	open_file(char *path)
