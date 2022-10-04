@@ -6,7 +6,14 @@
 #include <math.h>
 #include "converter.h"
 #include "checker.h"
-
+#include <float.h>
+/*
+추가
+t_ray 구조체
+t_intersection 구조체
+t_circle 구조체
+vec_proj 함수
+*/
 typedef struct s_rgb
 {
 	int	r;
@@ -88,6 +95,24 @@ typedef struct s_object
 	int		type;
 	void	*object;
 }	t_object;
+
+typedef struct s_ray
+{
+	t_vector	origin;
+	t_vector	direction;
+}	t_ray;
+
+typedef struct s_intersection
+{
+	double	t1;
+	double	t2;
+}	t_intersection;
+
+typedef struct s_circle
+{
+	t_coordinate	center;
+	double			radius;
+}	t_circle;
 
 int	check_rgb(t_rgb rgb)
 {
@@ -443,6 +468,77 @@ double	vec_magnitude(t_vector vec)
 	return (sqrt(vec_dot(vec, vec)));
 }
 
+t_vector	vec_proj(t_vector v1, t_vector v2)
+{
+	t_vector	ret;
+	double		scalar;
+
+	scalar = vec_dot(v1, v2) / vec_magnitude(v2);
+	ret.x = v2.x * scalar;
+	ret.y = v2.y * scalar;
+	ret.z = v2.z * scalar;
+	return (ret);
+}
+
+int	intersect_circle(t_ray ray, t_circle cir, t_intersection *inter)
+{
+	double			a;
+	double			b;
+	double			c;
+	double			discriminant;
+	t_vector		origin_to_center;
+
+	origin_to_center = vec_sub(ray.origin, cir.center);
+	a = vec_dot(ray.direction, ray.direction);
+	b = 2 * vec_dot(origin_to_center, ray.direction);
+	c = vec_dot(origin_to_center, origin_to_center) - pow(cir.radius, 2);
+	discriminant = b * b - 4 * a * c;
+	if (discriminant < 0)
+		return (0);
+	inter->t1 = (-b + sqrt(discriminant)) / (2 * a);
+	inter->t2 = (-b - sqrt(discriminant)) / (2 * a);
+	return (1);
+}
+
+int	intersect_sphere(t_ray ray, t_sphere sp, t_intersection *inter)
+{
+	return (intersect_circle(ray, (t_circle){sp.coordinate, sp.diameter / 2}, inter));
+}
+
+int	intersect_cylinder_projection(t_ray ray, t_cylinder cy, t_intersection *inter) // unit vector check
+{
+	t_vector	center_par;
+	t_vector	center_perp;
+	t_ray		ray_par;
+	t_ray		ray_perp;
+
+	center_par = vec_proj(cy.coordinate, cy.normalized);
+	center_perp = vec_sub(cy.coordinate, center_par);
+	ray_par.origin = vec_proj(ray.origin, cy.normalized);
+	ray_perp.origin = vec_sub(ray.origin, ray_par.origin);
+	ray_par.direction = vec_proj(ray.direction, cy.normalized);
+	ray_perp.direction = vec_sub(ray.direction, ray_par.direction);
+	if (!intersect_circle(ray_perp, (t_circle){center_perp, cy.diameter / 2}, inter))
+		return (0);
+	return (1);
+}
+
+int	intersect_cylinder(t_ray ray, t_cylinder cy, t_intersection *inter)
+{
+	double	p_min;
+	double	p1;
+	double	p2;
+
+	if (!intersect_cylinder_projection(ray, cy, inter));
+		return (0);
+	p_min = vec_magnitude(vec_proj(cy.coordinate, cy.normalized));
+	p1 = vec_magnidue(vec_proj(vec_add(ray.origin, vec_scale(ray.direction, inter->t1)), cy.normalized));
+	p2 = vec_magnidue(vec_proj(vec_add(ray.origin, vec_scale(ray.direction, inter->t2)), cy.normalized));
+	if (p1 < p_min && p_min < p2)
+		
+
+	return (1);
+}
 int	open_file(char *path)
 {
 	int	fd;
