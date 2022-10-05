@@ -23,9 +23,9 @@
 // 	double	x;
 // 	double	y;
 // 	double	z;
-// }	t_coordinate;
+// }	t_coord;
 
-// typedef	t_coordinate	t_vector;
+// typedef	t_coord	t_vec;
 
 // typedef struct s_ambient
 // {
@@ -35,7 +35,7 @@
 
 // typedef struct s_light
 // {
-// 	t_coordinate	coordinate;
+// 	t_coord	coordinate;
 // 	double			intensity;
 // 	t_rgb			rgb;
 // }	t_light;
@@ -43,33 +43,33 @@
 
 // typedef struct s_camera
 // {
-// 	t_coordinate	coordinate;
-// 	t_vector		normalized;
+// 	t_coord	coordinate;
+// 	t_vec		normalized;
 // 	int				fov;
 // }	t_camera;
 
 // typedef struct s_sphere
 // {
-// 	t_coordinate	coordinate;
+// 	t_coord	coordinate;
 // 	double			diameter;
 // 	t_rgb			rgb;
-// }	t_sphere;
+// }	t_sp;
 
 // typedef struct s_plane
 // {
-// 	t_coordinate	coordinate;
-// 	t_vector		normalized;
+// 	t_coord	coordinate;
+// 	t_vec		normalized;
 // 	t_rgb			rgb;
-// }	t_plane;
+// }	t_pl;
 
 // typedef struct s_cylinder
 // {
-// 	t_coordinate	coordinate;
-// 	t_vector		normalized;
+// 	t_coord	coordinate;
+// 	t_vec		normalized;
 // 	double			diameter;
 // 	double			height;
 // 	t_rgb			rgb;
-// }	t_cylinder;
+// }	t_cy;
 
 // typedef struct s_node
 // {
@@ -99,7 +99,7 @@
 // 	return (-1 < r && r < 256 && -1 < g && g < 256 && -1 < b && b < 256);
 // }
 
-// int	check_normal(t_vector vec)
+// int	check_normal(t_vec vec)
 // {
 // 	double	x;
 // 	double	y;
@@ -141,7 +141,7 @@
 // 	return (free_splitted(rgb_info, 1));
 // }
 
-// int	set_coordinate(char *coord_str, t_coordinate *coord)
+// int	set_coordinate(char *coord_str, t_coord *coord)
 // {
 // 	char	**coord_info;
 // 	int		coord_info_cnt;
@@ -198,7 +198,7 @@
 // 	return (1);
 // }
 
-// int	set_plane(char **info, t_plane *pl)// caller must check whether the count of splitted is 4. and this function is called only if splitted[0] is "pl"
+// int	set_plane(char **info, t_pl *pl)// caller must check whether the count of splitted is 4. and this function is called only if splitted[0] is "pl"
 // {
 // 	if (!set_coordinate(info[1], &(pl->coordinate)))
 // 		return (0);
@@ -210,7 +210,7 @@
 // 	return (1);
 // }
 
-// int	set_sphere(char **info, t_sphere *sp)// caller must check whether the count of splitted is 4. and this function is called only if splitted[0] is "sp"
+// int	set_sphere(char **info, t_sp *sp)// caller must check whether the count of splitted is 4. and this function is called only if splitted[0] is "sp"
 // {
 // 	double	diameter;
 
@@ -224,7 +224,7 @@
 // 	return (1);
 // }
 
-// int	set_cylinder(char **info, t_cylinder *cy)// caller must check whether the count of splitted is 6. and this function is called only if splitted[0] is "cy"
+// int	set_cylinder(char **info, t_cy *cy)// caller must check whether the count of splitted is 6. and this function is called only if splitted[0] is "cy"
 // {
 // 	double	diameter;
 // 	double	height;
@@ -308,7 +308,7 @@
 // 	char		*str3 = "cy 50.0,0.0,20.6 0.0,0.0,1.0 14.2 21.42 10,0,255";
 
 
-// 	t_cylinder	cy;
+// 	t_cy	cy;
 // 	char		**splitted;
 // 	int			count;
 

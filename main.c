@@ -10,7 +10,7 @@
 /*
 추가
 t_ray 구조체
-t_intersection 구조체
+t_inter 구조체
 t_circle 구조체
 vec_proj 함수
 */
@@ -26,9 +26,9 @@ typedef struct s_coordinate
 	double	x;
 	double	y;
 	double	z;
-}	t_coordinate;
+}	t_coord;
 
-typedef	t_coordinate	t_vector;
+typedef	t_coord	t_vec;
 
 typedef struct s_ambient
 {
@@ -38,7 +38,7 @@ typedef struct s_ambient
 
 typedef struct s_light
 {
-	t_coordinate	coordinate;
+	t_coord	coordinate;
 	double			intensity;
 	t_rgb			rgb;
 }	t_light;
@@ -46,33 +46,33 @@ typedef struct s_light
 
 typedef struct s_camera
 {
-	t_coordinate	coordinate;
-	t_vector		normalized;
+	t_coord	coordinate;
+	t_vec		normalized;
 	int				fov;
 }	t_camera;
 
 typedef struct s_sphere
 {
-	t_coordinate	coordinate;
+	t_coord	coordinate;
 	double			diameter;
 	t_rgb			rgb;
-}	t_sphere;
+}	t_sp;
 
 typedef struct s_plane
 {
-	t_coordinate	coordinate;
-	t_vector		normalized;
+	t_coord	coordinate;
+	t_vec		normalized;
 	t_rgb			rgb;
-}	t_plane;
+}	t_pl;
 
 typedef struct s_cylinder
 {
-	t_coordinate	coordinate;
-	t_vector		normalized;
+	t_coord	coordinate;
+	t_vec		normalized;
 	double			diameter;
 	double			height;
 	t_rgb			rgb;
-}	t_cylinder;
+}	t_cy;
 
 typedef struct s_node
 {
@@ -94,24 +94,24 @@ typedef struct s_object
 {
 	int		type;
 	void	*object;
-}	t_object;
+}	t_obj;
 
 typedef struct s_ray
 {
-	t_vector	origin;
-	t_vector	direction;
+	t_vec	origin;
+	t_vec	direction;
 }	t_ray;
 
 typedef struct s_intersection
 {
 	double	t1;
 	double	t2;
-}	t_intersection;
+}	t_inter;
 
 typedef struct s_circle
 {
-	t_coordinate	center;
-	double			radius;
+	t_coord	center;
+	double	radius;
 }	t_circle;
 
 int	check_rgb(t_rgb rgb)
@@ -126,7 +126,7 @@ int	check_rgb(t_rgb rgb)
 	return (-1 < r && r < 256 && -1 < g && g < 256 && -1 < b && b < 256);
 }
 
-int	check_normal(t_vector vec)
+int	check_normal(t_vec vec)
 {
 	double	x;
 	double	y;
@@ -168,7 +168,7 @@ int	set_rgb(char *rgb_str, t_rgb *rgb)
 	return (free_splitted(rgb_info, 1));
 }
 
-int	set_coordinate(char *coord_str, t_coordinate *coord)
+int	set_coordinate(char *coord_str, t_coord *coord)
 {
 	char	**coord_info;
 	int		coord_info_cnt;
@@ -246,11 +246,11 @@ t_node	*get_last_node(t_node *list) // this function is called after malloc, so 
 
 int	set_plane(char **info, int cnt, t_rt_info *rt_info)
 {
-	t_plane	*pl;
+	t_pl	*pl;
 
 	if (cnt != 4)
 		return (0);
-	pl = (t_plane *)(get_last_node(rt_info->pl)->data);
+	pl = (t_pl *)(get_last_node(rt_info->pl)->data);
 	if (!set_coordinate(info[1], &(pl->coordinate)))
 		return (0);
 	if (!set_coordinate(info[2], &(pl->normalized))
@@ -264,11 +264,11 @@ int	set_plane(char **info, int cnt, t_rt_info *rt_info)
 int	set_sphere(char **info, int cnt, t_rt_info *rt_info)
 {
 	double		diameter;
-	t_sphere	*sp;
+	t_sp	*sp;
 
 	if (cnt != 4)
 		return (0);
-	sp = (t_sphere *)(get_last_node(rt_info->sp)->data);
+	sp = (t_sp *)(get_last_node(rt_info->sp)->data);
 	if (!set_coordinate(info[1], &(sp->coordinate)))
 		return (0);
 	if (!get_double(info[2], &diameter) || diameter < 0)
@@ -283,11 +283,11 @@ int	set_cylinder(char **info, int cnt, t_rt_info *rt_info)
 {
 	double		diameter;
 	double		height;
-	t_cylinder	*cy;
+	t_cy	*cy;
 
 	if (cnt != 6)
 		return (0);
-	cy = (t_cylinder *)(get_last_node(rt_info->cy)->data);
+	cy = (t_cy *)(get_last_node(rt_info->cy)->data);
 	if (!set_coordinate(info[1], &(cy->coordinate)))
 		return (0);
 	if (!set_coordinate(info[2], &(cy->normalized))
@@ -304,9 +304,9 @@ int	set_cylinder(char **info, int cnt, t_rt_info *rt_info)
 }
 
 int	alloc_sphere(void **ptr){
-	t_sphere	*sp;
+	t_sp	*sp;
 	
-	sp = (t_sphere *)malloc(sizeof(t_sphere));
+	sp = (t_sp *)malloc(sizeof(t_sp));
 	if (!sp)
 		return (0);
 	*ptr = (void *)sp;
@@ -314,9 +314,9 @@ int	alloc_sphere(void **ptr){
 }
 
 int	alloc_plane(void **ptr){
-	t_plane	*pl;
+	t_pl	*pl;
 	
-	pl = (t_plane *)malloc(sizeof(t_plane));
+	pl = (t_pl *)malloc(sizeof(t_pl));
 	if (!pl)
 		return (0);
 	*ptr = (void *)pl;
@@ -324,9 +324,9 @@ int	alloc_plane(void **ptr){
 }
 
 int	alloc_cylinder(void **ptr){
-	t_cylinder	*cy;
+	t_cy	*cy;
 	
-	cy = (t_cylinder *)malloc(sizeof(t_cylinder));
+	cy = (t_cy *)malloc(sizeof(t_cy));
 	if (!cy)
 		return (0);
 	*ptr = (void *)cy;
@@ -420,9 +420,9 @@ int	set_rt_info(char *line, t_rt_info *rt, int *mask)
 	return (free_splitted(splitted, 1));
 }
 
-t_vector	vec_add(t_vector v1, t_vector v2)
+t_vec	vec_add(t_vec v1, t_vec v2)
 {
-	t_vector	ret;
+	t_vec	ret;
 
 	ret.x = v1.x + v2.x;
 	ret.y = v1.y + v2.y;
@@ -430,9 +430,9 @@ t_vector	vec_add(t_vector v1, t_vector v2)
 	return (ret);
 }
 
-t_vector	vec_sub(t_vector v1, t_vector v2)
+t_vec	vec_sub(t_vec v1, t_vec v2)
 {
-	t_vector	ret;
+	t_vec	ret;
 
 	ret.x = v1.x - v2.x;
 	ret.y = v1.y - v2.y;
@@ -440,7 +440,7 @@ t_vector	vec_sub(t_vector v1, t_vector v2)
 	return (ret);
 }
 
-t_vector	vec_scale(t_vector vec, double scalar)
+t_vec	vec_scale(t_vec vec, double scalar)
 {
 	vec.x *= scalar;
 	vec.y *= scalar;
@@ -448,14 +448,14 @@ t_vector	vec_scale(t_vector vec, double scalar)
 	return (vec);
 }
 
-double	vec_dot(t_vector v1, t_vector v2)
+double	vec_dot(t_vec v1, t_vec v2)
 {
 	return (v1.x * v2.x + v1.y * v2.y + v1.z * v2.z);
 }
 
-t_vector	vec_cross(t_vector v1, t_vector v2)
+t_vec	vec_cross(t_vec v1, t_vec v2)
 {
-	t_vector	ret;
+	t_vec	ret;
 
 	ret.x = v1.y * v2.z - v1.z * v2.y;
 	ret.y = v1.z * v2.x - v1.x * v2.z;
@@ -463,15 +463,15 @@ t_vector	vec_cross(t_vector v1, t_vector v2)
 	return (ret);
 }
 
-double	vec_magnitude(t_vector vec)
+double	vec_magnitude(t_vec vec)
 {
 	return (sqrt(vec_dot(vec, vec)));
 }
 
-t_vector	vec_proj(t_vector v1, t_vector v2)
+t_vec	vec_proj(t_vec v1, t_vec v2)
 {
-	t_vector	ret;
-	double		scalar;
+	t_vec	ret;
+	double	scalar;
 
 	scalar = vec_dot(v1, v2) / vec_magnitude(v2);
 	ret.x = v2.x * scalar;
@@ -480,13 +480,13 @@ t_vector	vec_proj(t_vector v1, t_vector v2)
 	return (ret);
 }
 
-int	intersect_circle(t_ray ray, t_circle cir, t_intersection *inter)
+int	intersect_circle(t_ray ray, t_circle cir, t_inter *inter)
 {
-	double			a;
-	double			b;
-	double			c;
-	double			discriminant;
-	t_vector		origin_to_center;
+	double		a;
+	double		b;
+	double		c;
+	double		discriminant;
+	t_vec		origin_to_center;
 
 	origin_to_center = vec_sub(ray.origin, cir.center);
 	a = vec_dot(ray.direction, ray.direction);
@@ -495,22 +495,50 @@ int	intersect_circle(t_ray ray, t_circle cir, t_intersection *inter)
 	discriminant = b * b - 4 * a * c;
 	if (discriminant < 0)
 		return (0);
-	inter->t1 = (-b + sqrt(discriminant)) / (2 * a);
-	inter->t2 = (-b - sqrt(discriminant)) / (2 * a);
+	inter->t1 = (-b - sqrt(discriminant)) / (2 * a); // smaller
+	inter->t2 = (-b + sqrt(discriminant)) / (2 * a); // bigger
 	return (1);
 }
 
-int	intersect_sphere(t_ray ray, t_sphere sp, t_intersection *inter)
+int	get_min_intersection(double *ret, t_inter *i)
 {
-	return (intersect_circle(ray, (t_circle){sp.coordinate, sp.diameter / 2}, inter));
+	if (i->t1 <= 1 && i->t2 <= 1)
+		return (0);
+	*ret = i->t2;
+	if (i->t1 > t_min)
+		*ret = i->t1;
+	return (1);
 }
 
-int	intersect_cylinder_projection(t_ray ray, t_cylinder cy, t_intersection *inter) // unit vector check
+int	intersect_sphere(t_ray ray, t_sp sp, double	*t)
 {
-	t_vector	center_par;
-	t_vector	center_perp;
+	t_inter		*i;
+	t_circle	p;
+
+	p.center = sp.coordinate;
+	p.radius = sp.diameter / 2;
+	return (intersect_circle(ray, p, i) && get_min_intersection(t, i));
+}
+
+int	intersect_cylinder(t_ray ray, t_cy cy, double *t)
+{
+	t_inter	inter1;
+	t_inter	inter2;
+	double			t1;
+	double			t2;
+
+
+
+}
+// unit vector check
+// cylinder is infinite.
+int	intersect_cylinder_(t_ray ray, t_cy cy, t_inter *inter)
+{
+	t_vec	center_par;
+	t_vec	center_perp;
 	t_ray		ray_par;
 	t_ray		ray_perp;
+	t_circle	projected;
 
 	center_par = vec_proj(cy.coordinate, cy.normalized);
 	center_perp = vec_sub(cy.coordinate, center_par);
@@ -518,27 +546,38 @@ int	intersect_cylinder_projection(t_ray ray, t_cylinder cy, t_intersection *inte
 	ray_perp.origin = vec_sub(ray.origin, ray_par.origin);
 	ray_par.direction = vec_proj(ray.direction, cy.normalized);
 	ray_perp.direction = vec_sub(ray.direction, ray_par.direction);
-	if (!intersect_circle(ray_perp, (t_circle){center_perp, cy.diameter / 2}, inter))
+	projected.center = center_perp;
+	projected.radius = cy.diameter / 2;
+	if (!intersect_circle(ray_perp, projected, inter))
 		return (0);
 	return (1);
 }
 
-int	intersect_cylinder(t_ray ray, t_cylinder cy, t_intersection *inter)
+int	intersect_(t_ray ray, t_cy cy, t_inter t1t2, t_inter *inter)
 {
-	double	p_min;
-	double	p1;
-	double	p2;
+	double	bottom;
+	double	top;
+	double	proj1;
+	double	proj2;
 
-	if (!intersect_cylinder_projection(ray, cy, inter));
-		return (0);
-	p_min = vec_magnitude(vec_proj(cy.coordinate, cy.normalized));
-	p1 = vec_magnidue(vec_proj(vec_add(ray.origin, vec_scale(ray.direction, inter->t1)), cy.normalized));
-	p2 = vec_magnidue(vec_proj(vec_add(ray.origin, vec_scale(ray.direction, inter->t2)), cy.normalized));
-	if (p1 < p_min && p_min < p2)
-		
-
-	return (1);
+	bottom = vec_magnitude(vec_proj(cy.coordinate, cy.normalized));
+	top = bottom + cy.height;
+	proj1 = vec_magnitude(vec_proj(vec_add(
+		ray.origin, vec_scale(ray.direction, inter.t1)), cy.normalized));
+	proj2 = vec_magnitude(vec_proj(vec_add(
+		ray.origin, vec_scale(ray.direction, inter.t2)), cy.normalized));
+	// if ((proj1 < bottom && proj2 < bottom) 
+	// 	|| (bottom <= proj1 && proj1 <= top && bottom <= proj2 && proj2 <= top)
+	// 	|| (top < proj1 && top < proj2))
+	// 	return (0);
+	if (proj1 < bottom && bottom < proj2)
+	{
+		inter->t1 = vec_magnitude(vec_proj())
+		return (1);
+	}
+	return (0);
 }
+
 int	open_file(char *path)
 {
 	int	fd;
