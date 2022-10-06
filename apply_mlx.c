@@ -280,7 +280,7 @@ int	set_cylinder(char **info, int cnt, t_rt_info *rt_info)
 
 int	alloc_sphere(void **ptr){
 	t_sphere	*sp;
-	
+
 	sp = (t_sphere *)malloc(sizeof(t_sphere));
 	if (!sp)
 		return (0);
@@ -290,7 +290,7 @@ int	alloc_sphere(void **ptr){
 
 int	alloc_plane(void **ptr){
 	t_plane	*pl;
-	
+
 	pl = (t_plane *)malloc(sizeof(t_plane));
 	if (!pl)
 		return (0);
@@ -300,7 +300,7 @@ int	alloc_plane(void **ptr){
 
 int	alloc_cylinder(void **ptr){
 	t_cylinder	*cy;
-	
+
 	cy = (t_cylinder *)malloc(sizeof(t_cylinder));
 	if (!cy)
 		return (0);
@@ -312,7 +312,7 @@ int	alloc_new_node(t_node **node, int index)
 {
 	static int	(*allocator[3])(void **)
 		= {alloc_sphere, alloc_plane, alloc_cylinder};
-	
+
 	*node = (t_node *)malloc(sizeof(t_node));
 	if (!(*node))
 		return (0);
@@ -476,11 +476,59 @@ int	read_file(int fd, t_rt_info *rt_info)
 		return (0);
 	return (1);
 }
-
-/////////////////////
+///////////////////// mlx
+#define ESC_KEY		53
+#define ZOOM_KEY		6
+#define COLOR_KEY		8
+#define WHEELUP		4
+#define WHEELDOWN		5
+#define LEFT			123
+#define UP				126
+#define RIGHT			124
+#define DOWN			125
+#define WIDTH			1000
+#define HEIGHT			1000
+#define SIZE			1000
 #define P_WID 1280
 #define P_HEI 720
 
+typedef struct s_img
+{
+	void	*ptr;
+	char	*addr;
+	int		bits_per_pixel;
+	int		line_length;
+	int		endian;
+}	t_img;
+
+typedef struct s_vars
+{
+	void		*mlx;
+	void		*win;
+	t_img		img;
+}	t_vars;
+
+int	init_mlx_pointers(t_vars *vars)
+{
+	vars->mlx = mlx_init();
+	if (!vars->mlx)
+		return (0);
+	vars->win = mlx_new_window(vars->mlx, P_WID, P_HEI, "miniRT");
+	if (!vars->win)
+		return (0);
+	vars->img.ptr = mlx_new_image(vars->mlx, P_WID, P_HEI);
+	if (!vars->img.ptr)
+		return (0);
+	vars->img.addr = mlx_get_data_addr(vars->img.ptr, &vars->img.bits_per_pixel,
+			&vars->img.line_length, &vars->img.endian);
+	if (!vars->img.addr)
+		return (0);
+	return (1);
+}
+
+
+
+///////////////////// get_ray
 t_vector	get_ab_vec(t_vector v)
 {
 	t_vector	ret;
@@ -500,23 +548,24 @@ t_vector	get_ab_vec(t_vector v)
 	return (ret);
 }
 
-void	get_pixel_info(t_rt_info *rt_info, t_vector *p_h, t_vector *p_v,\
+void	get_pixel_info(t_rt_info rt_info, t_vector *p_h, t_vector *p_v,\
 		t_coordinate *top_left)
 {
 	t_vector	h;
 	t_vector	v;
+	t_vector	tmp;
 	double		vp_h;
 	double		vp_w;
 
-	vp_w = tan((rt_info->c.fov * M_PI / 180.0) / 2.0) * 2;
+	vp_w = tan((rt_info.c.fov * M_PI / 180.0) / 2.0) * 2;
 	vp_h = vp_w * ((double)P_HEI / (double)P_WID);
-	h = vec_cross(rt_info->c.normalized, get_ab_vec(rt_info->c.normalized));
-	v = vec_cross(rt_info->c.normalized, h);
+	h = vec_cross(rt_info.c.normalized, get_ab_vec(rt_info.c.normalized));
+	v = vec_cross(rt_info.c.normalized, h);
 	h = vec_scale(h, (double)1 / vec_magnitude(h) * (vp_w / (double)P_WID));
 	v = vec_scale(v, (double)1 / vec_magnitude(v) * (vp_h / (double)P_HEI));
 	*p_h = h;
 	*p_v = v;
-	tmp = vec_add(rt_info->c.coordinate, rt_info->c.normalized);
+	tmp = vec_add(rt_info.c.coordinate, rt_info.c.normalized);
 	tmp = vec_sub(tmp, vec_scale(h, (double)P_WID / (double)2));
 	tmp = vec_sub(tmp, vec_scale(v, (double)P_HEI / (double)2));
 	*top_left = tmp;
@@ -527,7 +576,7 @@ void	print_vec(t_vector v)	//function for test.
 	printf("(%lf, %lf, %lf)", v.x, v.y, v.z);
 }
 
-int drawing_img(t_rt_info *rt_info) //add img parameter.
+int draw_img(t_rt_info rt_info, t_vars var)
 {
 	t_coordinate	top_left;
 	t_vector		p_h;
@@ -548,6 +597,7 @@ int drawing_img(t_rt_info *rt_info) //add img parameter.
 		}
 		printf("\n");
 	}
+	mlx_put_image_to_window(vars->mlx, vars->win, vars->img.ptr, 0, 0);
 	return (1);
 }
 ////////////////////////
@@ -556,6 +606,7 @@ int	main(int argc, char **argv)
 {
 	int			fd;
 	t_rt_info	rt_info;
+	t_var		var;
 
 	if (argc != 2)
 		return (0); // call error handling function with proper error message.
