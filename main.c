@@ -6,13 +6,14 @@
 #include <math.h>
 #include "converter.h"
 #include "checker.h"
-#include <float.h>
+
+#define SPHERE		1
+#define	CYLINDER	2
+#define	PLANE		3
+//#define	INFINITY	1e500
 /*
 추가
-t_ray 구조체
-t_inter 구조체
-t_circle 구조체
-vec_proj 함수
+구, 원기둥, 평면과 광선의 교점에서의 t를 찾는 함수들 및 그에 필요한 여러 구조체들 (t는 광선에 대한 식인 o + td에서의 t. o와 d는 각각 광원의 위치, 광선의 방향 벡터)
 */
 typedef struct s_rgb
 {
@@ -38,40 +39,40 @@ typedef struct s_ambient
 
 typedef struct s_light
 {
-	t_coord	coordinate;
-	double			intensity;
-	t_rgb			rgb;
+	t_coord	coord;
+	double	intensity;
+	t_rgb	rgb;
 }	t_light;
 
 
 typedef struct s_camera
 {
-	t_coord	coordinate;
-	t_vec		normalized;
-	int				fov;
+	t_coord	coord;
+	t_vec	norm;
+	int		fov;
 }	t_camera;
 
 typedef struct s_sphere
 {
-	t_coord	coordinate;
-	double			diameter;
-	t_rgb			rgb;
+	t_coord	coord;
+	double	diameter;
+	t_rgb	rgb;
 }	t_sp;
 
 typedef struct s_plane
 {
-	t_coord	coordinate;
-	t_vec		normalized;
-	t_rgb			rgb;
+	t_coord	coord;
+	t_vec	norm;
+	t_rgb	rgb;
 }	t_pl;
 
 typedef struct s_cylinder
 {
-	t_coord	coordinate;
-	t_vec		normalized;
-	double			diameter;
-	double			height;
-	t_rgb			rgb;
+	t_coord	coord;
+	t_vec	norm;
+	double	diameter;
+	double	height;
+	t_rgb	rgb;
 }	t_cy;
 
 typedef struct s_node
@@ -94,12 +95,13 @@ typedef struct s_object
 {
 	int		type;
 	void	*object;
+	double	t;
 }	t_obj;
 
 typedef struct s_ray
 {
-	t_vec	origin;
-	t_vec	direction;
+	t_vec	pos;
+	t_vec	dir;
 }	t_ray;
 
 typedef struct s_intersection
@@ -208,7 +210,7 @@ int	set_light(char **info, int cnt, t_rt_info *rt_info)
 	if (cnt != 4)
 		return (0);
 	l = &(rt_info->l);
-	if (!set_coordinate(info[1], &(l->coordinate)))
+	if (!set_coordinate(info[1], &(l->coord)))
 		return (0);
 	if (!get_double(info[2], &intensitiy) || intensitiy < 0 || 1 < intensitiy)
 		return (0);
@@ -226,10 +228,10 @@ int	set_camera(char **info, int cnt, t_rt_info *rt_info)
 	if (cnt != 4)
 		return (0);
 	c = &(rt_info->c);
-	if (!set_coordinate(info[1], &(c->coordinate)))
+	if (!set_coordinate(info[1], &(c->coord)))
 		return (0);
-	if (!set_coordinate(info[2], &(c->normalized))
-		|| !check_normal(c->normalized))
+	if (!set_coordinate(info[2], &(c->norm))
+		|| !check_normal(c->norm))
 		return (0);
 	if (!get_int(info[3], &fov)	|| fov < 0 || 180 < fov) // 180 0
 		return (0);
@@ -251,10 +253,10 @@ int	set_plane(char **info, int cnt, t_rt_info *rt_info)
 	if (cnt != 4)
 		return (0);
 	pl = (t_pl *)(get_last_node(rt_info->pl)->data);
-	if (!set_coordinate(info[1], &(pl->coordinate)))
+	if (!set_coordinate(info[1], &(pl->coord)))
 		return (0);
-	if (!set_coordinate(info[2], &(pl->normalized))
-		|| !check_normal(pl->normalized))
+	if (!set_coordinate(info[2], &(pl->norm))
+		|| !check_normal(pl->norm))
 		return (0);
 	if (!set_rgb(info[3], &(pl->rgb)))
 		return (0);
@@ -263,13 +265,13 @@ int	set_plane(char **info, int cnt, t_rt_info *rt_info)
 
 int	set_sphere(char **info, int cnt, t_rt_info *rt_info)
 {
-	double		diameter;
+	double	diameter;
 	t_sp	*sp;
 
 	if (cnt != 4)
 		return (0);
 	sp = (t_sp *)(get_last_node(rt_info->sp)->data);
-	if (!set_coordinate(info[1], &(sp->coordinate)))
+	if (!set_coordinate(info[1], &(sp->coord)))
 		return (0);
 	if (!get_double(info[2], &diameter) || diameter < 0)
 		return (0);
@@ -281,17 +283,17 @@ int	set_sphere(char **info, int cnt, t_rt_info *rt_info)
 
 int	set_cylinder(char **info, int cnt, t_rt_info *rt_info)
 {
-	double		diameter;
-	double		height;
+	double	diameter;
+	double	height;
 	t_cy	*cy;
 
 	if (cnt != 6)
 		return (0);
 	cy = (t_cy *)(get_last_node(rt_info->cy)->data);
-	if (!set_coordinate(info[1], &(cy->coordinate)))
+	if (!set_coordinate(info[1], &(cy->coord)))
 		return (0);
-	if (!set_coordinate(info[2], &(cy->normalized))
-		|| !check_normal(cy->normalized))
+	if (!set_coordinate(info[2], &(cy->norm))
+		|| !check_normal(cy->norm))
 		return (0);
 	if (!get_double(info[3], &diameter) || diameter < 0)
 		return (0);
@@ -422,30 +424,17 @@ int	set_rt_info(char *line, t_rt_info *rt, int *mask)
 
 t_vec	vec_add(t_vec v1, t_vec v2)
 {
-	t_vec	ret;
-
-	ret.x = v1.x + v2.x;
-	ret.y = v1.y + v2.y;
-	ret.z = v1.z + v2.z;
-	return (ret);
+	return ((t_vec){v1.x + v2.x, v1.y + v2.y, v1.z + v2.z});
 }
 
 t_vec	vec_sub(t_vec v1, t_vec v2)
 {
-	t_vec	ret;
-
-	ret.x = v1.x - v2.x;
-	ret.y = v1.y - v2.y;
-	ret.z = v1.z - v2.z;
-	return (ret);
+	return ((t_vec){v1.x - v2.x, v1.y - v2.y, v1.z - v2.z});
 }
 
 t_vec	vec_scale(t_vec vec, double scalar)
 {
-	vec.x *= scalar;
-	vec.y *= scalar;
-	vec.z *= scalar;
-	return (vec);
+	return ((t_vec){vec.x * scalar, vec.y * scalar, vec.z * scalar});
 }
 
 double	vec_dot(t_vec v1, t_vec v2)
@@ -455,29 +444,29 @@ double	vec_dot(t_vec v1, t_vec v2)
 
 t_vec	vec_cross(t_vec v1, t_vec v2)
 {
-	t_vec	ret;
-
-	ret.x = v1.y * v2.z - v1.z * v2.y;
-	ret.y = v1.z * v2.x - v1.x * v2.z;
-	ret.z = v1.x * v2.y - v1.y * v2.x;
-	return (ret);
+	return ((t_vec){v1.y * v2.z - v1.z * v2.y, v1.z * v2.x - v1.x * v2.z,
+		v1.x * v2.y - v1.y * v2.x});
 }
 
-double	vec_magnitude(t_vec vec)
+double	vec_len(t_vec vec)
 {
 	return (sqrt(vec_dot(vec, vec)));
 }
 
+t_vec	vec_normalize(t_vec vec)
+{
+	double	length;
+
+	length = vec_len(vec);
+	return ((t_vec){vec.x / length, vec.y / length, vec.z / length});
+}
+
 t_vec	vec_proj(t_vec v1, t_vec v2)
 {
-	t_vec	ret;
 	double	scalar;
 
-	scalar = vec_dot(v1, v2) / vec_magnitude(v2);
-	ret.x = v2.x * scalar;
-	ret.y = v2.y * scalar;
-	ret.z = v2.z * scalar;
-	return (ret);
+	scalar = vec_dot(v1, v2) / vec_len(v2);
+	return ((t_vec){v2.x * scalar, v2.y * scalar, v2.z * scalar});
 }
 
 int	intersect_circle(t_ray ray, t_circle cir, t_inter *inter)
@@ -488,9 +477,9 @@ int	intersect_circle(t_ray ray, t_circle cir, t_inter *inter)
 	double		discriminant;
 	t_vec		origin_to_center;
 
-	origin_to_center = vec_sub(ray.origin, cir.center);
-	a = vec_dot(ray.direction, ray.direction);
-	b = 2 * vec_dot(origin_to_center, ray.direction);
+	origin_to_center = vec_sub(ray.pos, cir.center);
+	a = vec_dot(ray.dir, ray.dir);
+	b = 2 * vec_dot(origin_to_center, ray.dir);
 	c = vec_dot(origin_to_center, origin_to_center) - pow(cir.radius, 2);
 	discriminant = b * b - 4 * a * c;
 	if (discriminant < 0)
@@ -500,13 +489,13 @@ int	intersect_circle(t_ray ray, t_circle cir, t_inter *inter)
 	return (1);
 }
 
-int	get_min_intersection(double *ret, t_inter *i)
+int	get_min_intersection(double *ret, t_inter i)
 {
-	if (i->t1 <= 1 && i->t2 <= 1)
+	if (i.t1 <= 1 && i.t2 <= 1)
 		return (0);
-	*ret = i->t2;
-	if (i->t1 > t_min)
-		*ret = i->t1;
+	*ret = i.t2;
+	if (i.t1 > 1)
+		*ret = i.t1;
 	return (1);
 }
 
@@ -515,67 +504,171 @@ int	intersect_sphere(t_ray ray, t_sp sp, double	*t)
 	t_inter		*i;
 	t_circle	p;
 
-	p.center = sp.coordinate;
+	p.center = sp.coord;
 	p.radius = sp.diameter / 2;
-	return (intersect_circle(ray, p, i) && get_min_intersection(t, i));
+	return (intersect_circle(ray, p, i) && get_min_intersection(t, *i));
 }
 
-int	intersect_cylinder(t_ray ray, t_cy cy, double *t)
+t_vec	ray_pos(t_ray ray, double t)
+{
+	return (vec_add(ray.pos, vec_scale(ray.dir, t)));
+}
+
+int	intersect_cylinder(t_ray ray, t_cy cy, double *t) // ray랑 normal이랑 평행한 지 확인해야 한다., get_min_intersection을 체크하는 함수 포인터를 전달한다.
 {
 	t_inter	inter1;
 	t_inter	inter2;
-	double			t1;
-	double			t2;
+	double	t1;
+	double	t2;
 
-
-
+	if (fabs(vec_len(vec_proj(vec_normalize(ray.dir), cy.norm)) - 1) < 1e-6)
+	{
+		if (!intersect_caps(ray, cy, &inter2)
+			|| !get_min_intersection(&t2, inter2))
+			return (0);
+		*t = t2;
+		return (1);
+	}
+	if (!intersect_body(ray, cy, &inter1))
+		return (0);
+	get_min_intersection(&t1, inter1);
+	inter2.t1 = 0;
+	inter2.t2 = 0;
+	intersect_caps(ray, cy, &inter2);
+	get_min_intersection(&t2, inter2);
+	if (!get_min_intersection(&t, (t_inter){t1, t2}))
+		return (0);
+	return (1);		
 }
 // unit vector check
 // cylinder is infinite.
-int	intersect_cylinder_(t_ray ray, t_cy cy, t_inter *inter)
+int	intersect_body(t_ray ray, t_cy cy, t_inter *inter)
 {
-	t_vec	center_par;
-	t_vec	center_perp;
-	t_ray		ray_par;
-	t_ray		ray_perp;
-	t_circle	projected;
+	t_vec		c_perp;
+	t_ray		r_perp;
+	double		proj_t1;
+	double		proj_t2;
 
-	center_par = vec_proj(cy.coordinate, cy.normalized);
-	center_perp = vec_sub(cy.coordinate, center_par);
-	ray_par.origin = vec_proj(ray.origin, cy.normalized);
-	ray_perp.origin = vec_sub(ray.origin, ray_par.origin);
-	ray_par.direction = vec_proj(ray.direction, cy.normalized);
-	ray_perp.direction = vec_sub(ray.direction, ray_par.direction);
-	projected.center = center_perp;
-	projected.radius = cy.diameter / 2;
-	if (!intersect_circle(ray_perp, projected, inter))
+	c_perp = vec_sub(cy.coord, vec_proj(cy.coord, cy.norm));
+	r_perp.pos = vec_sub(ray.pos, vec_proj(ray.pos, cy.norm));
+	r_perp.dir = vec_sub(ray.dir, vec_proj(ray.dir, cy.norm));
+	if (!intersect_circle(r_perp, (t_circle){c_perp, cy.diameter / 2}, inter))
 		return (0);
+	proj_t1 = vec_len(vec_proj(vec_sub(ray_pos(ray, inter->t1), cy.coord), cy.norm));
+	proj_t2 = vec_len(vec_proj(vec_sub(ray_pos(ray, inter->t2), cy.coord), cy.norm));
+	if (proj_t1 < 0 || cy.height < proj_t1)
+		inter->t1 = -1;
+	if (proj_t2 < 0 || cy.height < proj_t2)
+		inter->t2 = -1;
 	return (1);
 }
 
-int	intersect_(t_ray ray, t_cy cy, t_inter t1t2, t_inter *inter)
+int	intersect_caps(t_ray ray, t_cy cy, t_inter *inter)
 {
 	double	bottom;
 	double	top;
-	double	proj1;
-	double	proj2;
+	double	c_to_t1;
+	double	c_to_t2;
+	double	radius;
 
-	bottom = vec_magnitude(vec_proj(cy.coordinate, cy.normalized));
+	bottom = vec_len(vec_proj(cy.coord, cy.norm));
 	top = bottom + cy.height;
-	proj1 = vec_magnitude(vec_proj(vec_add(
-		ray.origin, vec_scale(ray.direction, inter.t1)), cy.normalized));
-	proj2 = vec_magnitude(vec_proj(vec_add(
-		ray.origin, vec_scale(ray.direction, inter.t2)), cy.normalized));
-	// if ((proj1 < bottom && proj2 < bottom) 
-	// 	|| (bottom <= proj1 && proj1 <= top && bottom <= proj2 && proj2 <= top)
-	// 	|| (top < proj1 && top < proj2))
-	// 	return (0);
-	if (proj1 < bottom && bottom < proj2)
+	inter->t1 = (bottom - vec_len(vec_proj(ray.pos, cy.norm)))
+		/ vec_len(vec_proj(ray.dir, cy.norm));
+	inter->t2 = (top - vec_len(vec_proj(ray.pos, cy.norm)))
+		/ vec_len(vec_proj(ray.dir, cy.norm));
+	c_to_t1 = vec_len(vec_sub(ray_pos(ray, inter->t1), cy.coord));
+	c_to_t2 = vec_len(vec_sub(ray_pos(ray, inter->t2), vec_add(
+			cy.coord, vec_scale(cy.norm, cy.height))));
+	radius = cy.diameter / 2;
+	if (c_to_t1 >= radius && c_to_t2 >= radius)
+		return (0);
+	if (c_to_t1 >= radius)
+		inter->t1 = -1;
+	if (c_to_t2 >= radius)
+		inter->t2 = -1;
+	return (1);
+}
+
+int	intersect_plane(t_ray ray, t_pl pl, double *t)
+{
+	double	ray_pl_dot;
+
+	ray_pl_dot = vec_dot(ray.pos, pl.norm);
+	if (ray_pl_dot < 1e-6)
+		return (0);
+	*t = vec_dot(vec_sub(pl.coord, ray.pos), pl.norm) / ray_pl_dot;
+	return (1);
+}
+
+void	check_sp(t_ray ray, t_node *sp, t_obj *obj, double initial)
+{
+	double	cur;
+	double	t;
+
+	if (!sp)
+		return ;
+	t = initial;
+	while (sp->data)
 	{
-		inter->t1 = vec_magnitude(vec_proj())
-		return (1);
+		if (intersect_sphere(ray, *((t_sp *)(sp->data)), &cur) && cur < t)
+		{
+			t = cur;
+			obj->type = SPHERE;
+			obj->object = (t_sp *)(sp->data);
+		}
 	}
-	return (0);
+	obj->t = t;
+}
+
+void	check_cy(t_ray ray, t_node *cy, t_obj *obj, double initial)
+{
+	double	cur;
+	double	t;
+
+	if (!cy)
+		return ;
+	t = initial;
+	while (cy->data)
+	{
+		if (intersect_cylinder(ray, *((t_cy *)(cy->data)), &cur) && cur < t)
+		{
+			t = cur;
+			obj->type = CYLINDER;
+			obj->object = (t_cy *)(cy->data);
+		}
+	}
+	obj->t = t;
+}
+
+void	check_pl(t_ray ray, t_node *pl, t_obj *obj, double initial)
+{
+	double	cur;
+	double	t;
+
+	if (!pl)
+		return ;
+	t = initial;
+	while (pl->data)
+	{
+		if (intersect_plane(ray, *((t_pl *)(pl->data)), &cur) && cur < t)
+		{
+			t = cur;
+			obj->type = PLANE;
+			obj->object = (t_pl *)(pl->data);
+		}
+	}
+	obj->t = t;
+}
+
+int	intersect(t_ray ray, t_rt_info info, t_obj *obj)
+{
+	obj->type = 0;
+	obj->t = INFINITY;
+	check_sp(ray, info.sp, obj, obj->t);
+	check_cy(ray, info.cy, obj, obj->t);
+	check_pl(ray, info.pl, obj, obj->t);
+    return (obj->type);
 }
 
 int	open_file(char *path)
