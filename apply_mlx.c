@@ -6,6 +6,7 @@
 #include <math.h>
 #include "converter.h"
 #include "checker.h"
+#include "mlx.h"
 
 typedef struct s_rgb
 {
@@ -19,9 +20,9 @@ typedef struct s_coordinate
 	double	x;
 	double	y;
 	double	z;
-}	t_coordinate;
+}	t_coord;
 
-typedef	t_coordinate	t_vector;
+typedef	t_coord	t_vec;
 
 typedef struct s_ambient
 {
@@ -31,41 +32,40 @@ typedef struct s_ambient
 
 typedef struct s_light
 {
-	t_coordinate	coordinate;
-	double			intensity;
-	t_rgb			rgb;
+	t_coord	coord;
+	double	intensity;
+	t_rgb	rgb;
 }	t_light;
-
 
 typedef struct s_camera
 {
-	t_coordinate	coordinate;
-	t_vector		normalized;
-	int				fov;
+	t_coord	coord;
+	t_vec	norm;
+	int		fov;
 }	t_camera;
 
 typedef struct s_sphere
 {
-	t_coordinate	coordinate;
-	double			diameter;
-	t_rgb			rgb;
-}	t_sphere;
+	t_coord	coord;
+	double	diameter;
+	t_rgb	rgb;
+}	t_sp;
 
 typedef struct s_plane
 {
-	t_coordinate	coordinate;
-	t_vector		normalized;
-	t_rgb			rgb;
-}	t_plane;
+	t_coord	coord;
+	t_vec	norm;
+	t_rgb	rgb;
+}	t_pl;
 
 typedef struct s_cylinder
 {
-	t_coordinate	coordinate;
-	t_vector		normalized;
-	double			diameter;
-	double			height;
-	t_rgb			rgb;
-}	t_cylinder;
+	t_coord	coord;
+	t_vec	norm;
+	double	diameter;
+	double	height;
+	t_rgb	rgb;
+}	t_cy;
 
 typedef struct s_node
 {
@@ -101,7 +101,7 @@ int	check_rgb(t_rgb rgb)
 	return (-1 < r && r < 256 && -1 < g && g < 256 && -1 < b && b < 256);
 }
 
-int	check_normal(t_vector vec)
+int	check_normal(t_vec vec)
 {
 	double	x;
 	double	y;
@@ -143,7 +143,7 @@ int	set_rgb(char *rgb_str, t_rgb *rgb)
 	return (free_splitted(rgb_info, 1));
 }
 
-int	set_coordinate(char *coord_str, t_coordinate *coord)
+int	set_coordinate(char *coord_str, t_coord *coord)
 {
 	char	**coord_info;
 	int		coord_info_cnt;
@@ -183,7 +183,7 @@ int	set_light(char **info, int cnt, t_rt_info *rt_info)
 	if (cnt != 4)
 		return (0);
 	l = &(rt_info->l);
-	if (!set_coordinate(info[1], &(l->coordinate)))
+	if (!set_coordinate(info[1], &(l->coord)))
 		return (0);
 	if (!get_double(info[2], &intensitiy) || intensitiy < 0 || 1 < intensitiy)
 		return (0);
@@ -201,10 +201,10 @@ int	set_camera(char **info, int cnt, t_rt_info *rt_info)
 	if (cnt != 4)
 		return (0);
 	c = &(rt_info->c);
-	if (!set_coordinate(info[1], &(c->coordinate)))
+	if (!set_coordinate(info[1], &(c->coord)))
 		return (0);
-	if (!set_coordinate(info[2], &(c->normalized))
-		|| !check_normal(c->normalized))
+	if (!set_coordinate(info[2], &(c->norm))
+		|| !check_normal(c->norm))
 		return (0);
 	if (!get_int(info[3], &fov)	|| fov < 0 || 180 < fov) // 180 0
 		return (0);
@@ -221,15 +221,15 @@ t_node	*get_last_node(t_node *list) // this function is called after malloc, so 
 
 int	set_plane(char **info, int cnt, t_rt_info *rt_info)
 {
-	t_plane	*pl;
+	t_pl	*pl;
 
 	if (cnt != 4)
 		return (0);
-	pl = (t_plane *)(get_last_node(rt_info->pl)->data);
-	if (!set_coordinate(info[1], &(pl->coordinate)))
+	pl = (t_pl *)(get_last_node(rt_info->pl)->data);
+	if (!set_coordinate(info[1], &(pl->coord)))
 		return (0);
-	if (!set_coordinate(info[2], &(pl->normalized))
-		|| !check_normal(pl->normalized))
+	if (!set_coordinate(info[2], &(pl->norm))
+		|| !check_normal(pl->norm))
 		return (0);
 	if (!set_rgb(info[3], &(pl->rgb)))
 		return (0);
@@ -239,12 +239,12 @@ int	set_plane(char **info, int cnt, t_rt_info *rt_info)
 int	set_sphere(char **info, int cnt, t_rt_info *rt_info)
 {
 	double		diameter;
-	t_sphere	*sp;
+	t_sp	*sp;
 
 	if (cnt != 4)
 		return (0);
-	sp = (t_sphere *)(get_last_node(rt_info->sp)->data);
-	if (!set_coordinate(info[1], &(sp->coordinate)))
+	sp = (t_sp *)(get_last_node(rt_info->sp)->data);
+	if (!set_coordinate(info[1], &(sp->coord)))
 		return (0);
 	if (!get_double(info[2], &diameter) || diameter < 0)
 		return (0);
@@ -258,15 +258,15 @@ int	set_cylinder(char **info, int cnt, t_rt_info *rt_info)
 {
 	double		diameter;
 	double		height;
-	t_cylinder	*cy;
+	t_cy	*cy;
 
 	if (cnt != 6)
 		return (0);
-	cy = (t_cylinder *)(get_last_node(rt_info->cy)->data);
-	if (!set_coordinate(info[1], &(cy->coordinate)))
+	cy = (t_cy *)(get_last_node(rt_info->cy)->data);
+	if (!set_coordinate(info[1], &(cy->coord)))
 		return (0);
-	if (!set_coordinate(info[2], &(cy->normalized))
-		|| !check_normal(cy->normalized))
+	if (!set_coordinate(info[2], &(cy->norm))
+		|| !check_normal(cy->norm))
 		return (0);
 	if (!get_double(info[3], &diameter) || diameter < 0)
 		return (0);
@@ -279,9 +279,9 @@ int	set_cylinder(char **info, int cnt, t_rt_info *rt_info)
 }
 
 int	alloc_sphere(void **ptr){
-	t_sphere	*sp;
+	t_sp	*sp;
 
-	sp = (t_sphere *)malloc(sizeof(t_sphere));
+	sp = (t_sp *)malloc(sizeof(t_sp));
 	if (!sp)
 		return (0);
 	*ptr = (void *)sp;
@@ -289,9 +289,9 @@ int	alloc_sphere(void **ptr){
 }
 
 int	alloc_plane(void **ptr){
-	t_plane	*pl;
+	t_pl	*pl;
 
-	pl = (t_plane *)malloc(sizeof(t_plane));
+	pl = (t_pl *)malloc(sizeof(t_pl));
 	if (!pl)
 		return (0);
 	*ptr = (void *)pl;
@@ -299,9 +299,9 @@ int	alloc_plane(void **ptr){
 }
 
 int	alloc_cylinder(void **ptr){
-	t_cylinder	*cy;
+	t_cy	*cy;
 
-	cy = (t_cylinder *)malloc(sizeof(t_cylinder));
+	cy = (t_cy *)malloc(sizeof(t_cy));
 	if (!cy)
 		return (0);
 	*ptr = (void *)cy;
@@ -395,9 +395,9 @@ int	set_rt_info(char *line, t_rt_info *rt, int *mask)
 	return (free_splitted(splitted, 1));
 }
 
-t_vector	vec_add(t_vector v1, t_vector v2)
+t_vec	vec_add(t_vec v1, t_vec v2)
 {
-	t_vector	ret;
+	t_vec	ret;
 
 	ret.x = v1.x + v2.x;
 	ret.y = v1.y + v2.y;
@@ -405,9 +405,9 @@ t_vector	vec_add(t_vector v1, t_vector v2)
 	return (ret);
 }
 
-t_vector	vec_sub(t_vector v1, t_vector v2)
+t_vec	vec_sub(t_vec v1, t_vec v2)
 {
-	t_vector	ret;
+	t_vec	ret;
 
 	ret.x = v1.x - v2.x;
 	ret.y = v1.y - v2.y;
@@ -415,7 +415,7 @@ t_vector	vec_sub(t_vector v1, t_vector v2)
 	return (ret);
 }
 
-t_vector	vec_scale(t_vector vec, double scalar)
+t_vec	vec_scale(t_vec vec, double scalar)
 {
 	vec.x *= scalar;
 	vec.y *= scalar;
@@ -423,14 +423,14 @@ t_vector	vec_scale(t_vector vec, double scalar)
 	return (vec);
 }
 
-double	vec_dot(t_vector v1, t_vector v2)
+double	vec_dot(t_vec v1, t_vec v2)
 {
 	return (v1.x * v2.x + v1.y * v2.y + v1.z * v2.z);
 }
 
-t_vector	vec_cross(t_vector v1, t_vector v2)
+t_vec	vec_cross(t_vec v1, t_vec v2)
 {
-	t_vector	ret;
+	t_vec	ret;
 
 	ret.x = v1.y * v2.z - v1.z * v2.y;
 	ret.y = v1.z * v2.x - v1.x * v2.z;
@@ -438,7 +438,7 @@ t_vector	vec_cross(t_vector v1, t_vector v2)
 	return (ret);
 }
 
-double	vec_magnitude(t_vector vec)
+double	vec_magnitude(t_vec vec)
 {
 	return (sqrt(vec_dot(vec, vec)));
 }
@@ -478,17 +478,10 @@ int	read_file(int fd, t_rt_info *rt_info)
 }
 ///////////////////// mlx
 #define ESC_KEY		53
-#define ZOOM_KEY		6
-#define COLOR_KEY		8
-#define WHEELUP		4
-#define WHEELDOWN		5
 #define LEFT			123
 #define UP				126
 #define RIGHT			124
 #define DOWN			125
-#define WIDTH			1000
-#define HEIGHT			1000
-#define SIZE			1000
 #define P_WID 1280
 #define P_HEI 720
 
@@ -529,9 +522,9 @@ int	init_mlx_pointers(t_vars *vars)
 
 
 ///////////////////// get_ray
-t_vector	get_ab_vec(t_vector v)
+t_vec	get_ab_vec(t_vec v)
 {
-	t_vector	ret;
+	t_vec	ret;
 
 	if (v.x == 0 && v.y == 0 && (v.z == 1 || v.z == -1))
 	{
@@ -548,43 +541,43 @@ t_vector	get_ab_vec(t_vector v)
 	return (ret);
 }
 
-void	get_pixel_info(t_rt_info rt_info, t_vector *p_h, t_vector *p_v,\
-		t_coordinate *top_left)
+void	get_pixel_info(t_camera c, t_vec *p_h, t_vec *p_v,\
+		t_coord *top_left)
 {
-	t_vector	h;
-	t_vector	v;
-	t_vector	tmp;
+	t_vec	h;
+	t_vec	v;
+	t_vec	tmp;
 	double		vp_h;
 	double		vp_w;
 
-	vp_w = tan((rt_info.c.fov * M_PI / 180.0) / 2.0) * 2;
+	vp_w = tan((c.fov * M_PI / 180.0) / 2.0) * 2;
 	vp_h = vp_w * ((double)P_HEI / (double)P_WID);
-	h = vec_cross(rt_info.c.normalized, get_ab_vec(rt_info.c.normalized));
-	v = vec_cross(rt_info.c.normalized, h);
+	h = vec_cross(c.norm, get_ab_vec(c.norm));
+	v = vec_cross(c.norm, h);
 	h = vec_scale(h, (double)1 / vec_magnitude(h) * (vp_w / (double)P_WID));
 	v = vec_scale(v, (double)1 / vec_magnitude(v) * (vp_h / (double)P_HEI));
 	*p_h = h;
 	*p_v = v;
-	tmp = vec_add(rt_info.c.coordinate, rt_info.c.normalized);
+	tmp = vec_add(c.coord, c.norm);
 	tmp = vec_sub(tmp, vec_scale(h, (double)P_WID / (double)2));
 	tmp = vec_sub(tmp, vec_scale(v, (double)P_HEI / (double)2));
 	*top_left = tmp;
 }
 
-void	print_vec(t_vector v)	//function for test.
+void	print_vec(t_vec v)	//function for test.
 {
 	printf("(%lf, %lf, %lf)", v.x, v.y, v.z);
 }
 
-int draw_img(t_rt_info rt_info, t_vars var)
+int draw_img(t_rt_info *rt_info, t_vars *vars)
 {
-	t_coordinate	top_left;
-	t_vector		p_h;
-	t_vector		p_v;
+	t_coord	top_left;
+	t_vec		p_h;
+	t_vec		p_v;
 	int				i;
 	int				j;
 
-	get_pixel_info(rt_info, &p_h, &p_v, &top_left);
+	get_pixel_info(rt_info->c, &p_h, &p_v, &top_left);
 	i = -1;
 	while (++i < P_HEI)
 	{
@@ -592,7 +585,7 @@ int draw_img(t_rt_info rt_info, t_vars var)
 		while (++j < P_WID)
 		{
 			print_vec(vec_sub(vec_add(vec_scale(p_v, j), \
-			vec_add(top_left, vec_scale(p_h, i))), rt_info->c.coordinate));	// for test.
+			vec_add(top_left, vec_scale(p_h, i))), rt_info->c.coord));	// for test.
 			printf(" ");
 		}
 		printf("\n");
@@ -606,10 +599,11 @@ int	main(int argc, char **argv)
 {
 	int			fd;
 	t_rt_info	rt_info;
-	t_var		var;
+	t_vars		vars;
 
 	if (argc != 2)
 		return (0); // call error handling function with proper error message.
+	init_mlx_pointers(&vars);
 	fd = open_file(argv[1]);
 	if (fd < 0) // remove this when error handling function is completed.
 		return (0); // 에러 문자열 출력하고 처리해주기
@@ -623,5 +617,6 @@ int	main(int argc, char **argv)
 	clear_list(&(rt_info.sp));
 	clear_list(&(rt_info.pl));
 	clear_list(&(rt_info.cy));
+	mlx_loop(vars.mlx);
 	return (0);
 }
