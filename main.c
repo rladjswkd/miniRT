@@ -568,7 +568,7 @@ int	intersect_sphere(t_ray ray, t_sp sp, double *t)// rename this to get_sphere_
 	eq.c = vec_dot(ray_sp, ray_sp) - pow(sp.diameter / 2, 2);
 	solve_equation(eq, &inter);
 	ret = choose_smaller_t(HUGE_VAL, inter.l, (1 < inter.l));
-	ret = choose_smaller_t(*t, inter.r, (1 < inter.r));
+	ret = choose_smaller_t(ret, inter.r, (1 < inter.r));
 	*t = ret;
 	return (ret != HUGE_VAL);
 }
