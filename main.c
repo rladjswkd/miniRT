@@ -671,6 +671,21 @@ int	intersect(t_ray ray, t_rt_info info, t_obj *obj)
     return (obj->type);
 }
 
+double	compute_lighting(t_vec p, t_vec n, t_rt_info info) // only for diffuse reflection, p_norm should be an unit vector
+{
+	double	lighting;
+	t_vec	p_to_l;
+	double	n_dot_l;
+
+	lighting = info.a.intensity;
+	p_to_l = vec_sub(info.l.coord, p);
+	n_dot_l = vec_dot(n, p_to_l);
+	if (n_dot_l > 0)
+		lighting += info.l.intensity * n_dot_l / (vec_len(n) * vec_len(p_to_l));
+	// shadow part should be added here
+    return (lighting);
+}
+
 int	open_file(char *path)
 {
 	int	fd;
