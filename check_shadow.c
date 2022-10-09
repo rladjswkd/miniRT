@@ -49,7 +49,7 @@ t_ray	get_l_ray(t_light l, t_ray ray, t_obj	obj)
 	t_vec	t_pos;
 
 	t_pos = vec_add(vec_scale(ray.dir, obj.t), ray.pos);
-	l_ray.dir = vec_sub(l.coord, ray.pos);
+	l_ray.dir = vec_sub(l.coord, t_pos);
 	l_ray.pos = vec_sub(t_pos, l_ray.dir);
 	return (l_ray);
 }
