@@ -7,6 +7,14 @@
 #include "converter.h"
 #include "checker.h"
 
+#define SPHERE		1
+#define	CYLINDER	2
+#define	PLANE		3
+//#define	INFINITY	1e500
+/*
+추가
+구, 원기둥, 평면과 광선의 교점에서의 t를 찾는 함수들 및 그에 필요한 여러 구조체들 (t는 광선에 대한 식인 o + td에서의 t. o와 d는 각각 광원의 위치, 광선의 방향 벡터)
+*/
 typedef struct s_rgb
 {
 	int	r;
@@ -19,9 +27,9 @@ typedef struct s_coordinate
 	double	x;
 	double	y;
 	double	z;
-}	t_coordinate;
+}	t_coord;
 
-typedef	t_coordinate	t_vector;
+typedef	t_coord	t_vec;
 
 typedef struct s_ambient
 {
@@ -31,41 +39,41 @@ typedef struct s_ambient
 
 typedef struct s_light
 {
-	t_coordinate	coordinate;
-	double			intensity;
-	t_rgb			rgb;
+	t_coord	coord;
+	double	intensity;
+	t_rgb	rgb;
 }	t_light;
 
 
 typedef struct s_camera
 {
-	t_coordinate	coordinate;
-	t_vector		normalized;
-	int				fov;
+	t_coord	coord;
+	t_vec	norm;
+	int		fov;
 }	t_camera;
 
 typedef struct s_sphere
 {
-	t_coordinate	coordinate;
-	double			diameter;
-	t_rgb			rgb;
-}	t_sphere;
+	t_coord	coord;
+	double	diameter;
+	t_rgb	rgb;
+}	t_sp;
 
 typedef struct s_plane
 {
-	t_coordinate	coordinate;
-	t_vector		normalized;
-	t_rgb			rgb;
-}	t_plane;
+	t_coord	coord;
+	t_vec	norm;
+	t_rgb	rgb;
+}	t_pl;
 
 typedef struct s_cylinder
 {
-	t_coordinate	coordinate;
-	t_vector		normalized;
-	double			diameter;
-	double			height;
-	t_rgb			rgb;
-}	t_cylinder;
+	t_coord	coord;
+	t_vec	norm;
+	double	diameter;
+	double	height;
+	t_rgb	rgb;
+}	t_cy;
 
 typedef struct s_node
 {
@@ -87,7 +95,26 @@ typedef struct s_object
 {
 	int		type;
 	void	*object;
-}	t_object;
+	double	t;
+}	t_obj;
+
+typedef struct s_ray
+{
+	t_vec	pos;
+	t_vec	dir;
+}	t_ray;
+
+typedef struct s_intersection
+{
+	double	t1;
+	double	t2;
+}	t_inter;
+
+typedef struct s_circle
+{
+	t_coord	center;
+	double	radius;
+}	t_circle;
 
 int	check_rgb(t_rgb rgb)
 {
@@ -101,7 +128,7 @@ int	check_rgb(t_rgb rgb)
 	return (-1 < r && r < 256 && -1 < g && g < 256 && -1 < b && b < 256);
 }
 
-int	check_normal(t_vector vec)
+int	check_normal(t_vec vec)
 {
 	double	x;
 	double	y;
@@ -143,7 +170,7 @@ int	set_rgb(char *rgb_str, t_rgb *rgb)
 	return (free_splitted(rgb_info, 1));
 }
 
-int	set_coordinate(char *coord_str, t_coordinate *coord)
+int	set_coordinate(char *coord_str, t_coord *coord)
 {
 	char	**coord_info;
 	int		coord_info_cnt;
@@ -183,7 +210,7 @@ int	set_light(char **info, int cnt, t_rt_info *rt_info)
 	if (cnt != 4)
 		return (0);
 	l = &(rt_info->l);
-	if (!set_coordinate(info[1], &(l->coordinate)))
+	if (!set_coordinate(info[1], &(l->coord)))
 		return (0);
 	if (!get_double(info[2], &intensitiy) || intensitiy < 0 || 1 < intensitiy)
 		return (0);
@@ -201,10 +228,10 @@ int	set_camera(char **info, int cnt, t_rt_info *rt_info)
 	if (cnt != 4)
 		return (0);
 	c = &(rt_info->c);
-	if (!set_coordinate(info[1], &(c->coordinate)))
+	if (!set_coordinate(info[1], &(c->coord)))
 		return (0);
-	if (!set_coordinate(info[2], &(c->normalized))
-		|| !check_normal(c->normalized))
+	if (!set_coordinate(info[2], &(c->norm))
+		|| !check_normal(c->norm))
 		return (0);
 	if (!get_int(info[3], &fov)	|| fov < 0 || 180 < fov) // 180 0
 		return (0);
@@ -221,15 +248,15 @@ t_node	*get_last_node(t_node *list) // this function is called after malloc, so 
 
 int	set_plane(char **info, int cnt, t_rt_info *rt_info)
 {
-	t_plane	*pl;
+	t_pl	*pl;
 
 	if (cnt != 4)
 		return (0);
-	pl = (t_plane *)(get_last_node(rt_info->pl)->data);
-	if (!set_coordinate(info[1], &(pl->coordinate)))
+	pl = (t_pl *)(get_last_node(rt_info->pl)->data);
+	if (!set_coordinate(info[1], &(pl->coord)))
 		return (0);
-	if (!set_coordinate(info[2], &(pl->normalized))
-		|| !check_normal(pl->normalized))
+	if (!set_coordinate(info[2], &(pl->norm))
+		|| !check_normal(pl->norm))
 		return (0);
 	if (!set_rgb(info[3], &(pl->rgb)))
 		return (0);
@@ -238,13 +265,13 @@ int	set_plane(char **info, int cnt, t_rt_info *rt_info)
 
 int	set_sphere(char **info, int cnt, t_rt_info *rt_info)
 {
-	double		diameter;
-	t_sphere	*sp;
+	double	diameter;
+	t_sp	*sp;
 
 	if (cnt != 4)
 		return (0);
-	sp = (t_sphere *)(get_last_node(rt_info->sp)->data);
-	if (!set_coordinate(info[1], &(sp->coordinate)))
+	sp = (t_sp *)(get_last_node(rt_info->sp)->data);
+	if (!set_coordinate(info[1], &(sp->coord)))
 		return (0);
 	if (!get_double(info[2], &diameter) || diameter < 0)
 		return (0);
@@ -256,17 +283,17 @@ int	set_sphere(char **info, int cnt, t_rt_info *rt_info)
 
 int	set_cylinder(char **info, int cnt, t_rt_info *rt_info)
 {
-	double		diameter;
-	double		height;
-	t_cylinder	*cy;
+	double	diameter;
+	double	height;
+	t_cy	*cy;
 
 	if (cnt != 6)
 		return (0);
-	cy = (t_cylinder *)(get_last_node(rt_info->cy)->data);
-	if (!set_coordinate(info[1], &(cy->coordinate)))
+	cy = (t_cy *)(get_last_node(rt_info->cy)->data);
+	if (!set_coordinate(info[1], &(cy->coord)))
 		return (0);
-	if (!set_coordinate(info[2], &(cy->normalized))
-		|| !check_normal(cy->normalized))
+	if (!set_coordinate(info[2], &(cy->norm))
+		|| !check_normal(cy->norm))
 		return (0);
 	if (!get_double(info[3], &diameter) || diameter < 0)
 		return (0);
@@ -279,9 +306,9 @@ int	set_cylinder(char **info, int cnt, t_rt_info *rt_info)
 }
 
 int	alloc_sphere(void **ptr){
-	t_sphere	*sp;
+	t_sp	*sp;
 	
-	sp = (t_sphere *)malloc(sizeof(t_sphere));
+	sp = (t_sp *)malloc(sizeof(t_sp));
 	if (!sp)
 		return (0);
 	*ptr = (void *)sp;
@@ -289,9 +316,9 @@ int	alloc_sphere(void **ptr){
 }
 
 int	alloc_plane(void **ptr){
-	t_plane	*pl;
+	t_pl	*pl;
 	
-	pl = (t_plane *)malloc(sizeof(t_plane));
+	pl = (t_pl *)malloc(sizeof(t_pl));
 	if (!pl)
 		return (0);
 	*ptr = (void *)pl;
@@ -299,9 +326,9 @@ int	alloc_plane(void **ptr){
 }
 
 int	alloc_cylinder(void **ptr){
-	t_cylinder	*cy;
+	t_cy	*cy;
 	
-	cy = (t_cylinder *)malloc(sizeof(t_cylinder));
+	cy = (t_cy *)malloc(sizeof(t_cy));
 	if (!cy)
 		return (0);
 	*ptr = (void *)cy;
@@ -395,52 +422,253 @@ int	set_rt_info(char *line, t_rt_info *rt, int *mask)
 	return (free_splitted(splitted, 1));
 }
 
-t_vector	vec_add(t_vector v1, t_vector v2)
+t_vec	vec_add(t_vec v1, t_vec v2)
 {
-	t_vector	ret;
-
-	ret.x = v1.x + v2.x;
-	ret.y = v1.y + v2.y;
-	ret.z = v1.z + v2.z;
-	return (ret);
+	return ((t_vec){v1.x + v2.x, v1.y + v2.y, v1.z + v2.z});
 }
 
-t_vector	vec_sub(t_vector v1, t_vector v2)
+t_vec	vec_sub(t_vec v1, t_vec v2)
 {
-	t_vector	ret;
-
-	ret.x = v1.x - v2.x;
-	ret.y = v1.y - v2.y;
-	ret.z = v1.z - v2.z;
-	return (ret);
+	return ((t_vec){v1.x - v2.x, v1.y - v2.y, v1.z - v2.z});
 }
 
-t_vector	vec_scale(t_vector vec, double scalar)
+t_vec	vec_scale(t_vec vec, double scalar)
 {
-	vec.x *= scalar;
-	vec.y *= scalar;
-	vec.z *= scalar;
-	return (vec);
+	return ((t_vec){vec.x * scalar, vec.y * scalar, vec.z * scalar});
 }
 
-double	vec_dot(t_vector v1, t_vector v2)
+double	vec_dot(t_vec v1, t_vec v2)
 {
 	return (v1.x * v2.x + v1.y * v2.y + v1.z * v2.z);
 }
 
-t_vector	vec_cross(t_vector v1, t_vector v2)
+t_vec	vec_cross(t_vec v1, t_vec v2)
 {
-	t_vector	ret;
-
-	ret.x = v1.y * v2.z - v1.z * v2.y;
-	ret.y = v1.z * v2.x - v1.x * v2.z;
-	ret.z = v1.x * v2.y - v1.y * v2.x;
-	return (ret);
+	return ((t_vec){v1.y * v2.z - v1.z * v2.y, v1.z * v2.x - v1.x * v2.z,
+		v1.x * v2.y - v1.y * v2.x});
 }
 
-double	vec_magnitude(t_vector vec)
+double	vec_len(t_vec vec)
 {
 	return (sqrt(vec_dot(vec, vec)));
+}
+
+t_vec	vec_normalize(t_vec vec)
+{
+	double	length;
+
+	length = vec_len(vec);
+	return ((t_vec){vec.x / length, vec.y / length, vec.z / length});
+}
+
+t_vec	vec_proj(t_vec v1, t_vec v2)
+{
+	double	scalar;
+
+	scalar = vec_dot(v1, v2) / vec_len(v2);
+	return ((t_vec){v2.x * scalar, v2.y * scalar, v2.z * scalar});
+}
+
+int	intersect_circle(t_ray ray, t_circle cir, t_inter *inter)
+{
+	double		a;
+	double		b;
+	double		c;
+	double		discriminant;
+	t_vec		origin_to_center;
+
+	origin_to_center = vec_sub(ray.pos, cir.center);
+	a = vec_dot(ray.dir, ray.dir);
+	b = 2 * vec_dot(origin_to_center, ray.dir);
+	c = vec_dot(origin_to_center, origin_to_center) - pow(cir.radius, 2);
+	discriminant = b * b - 4 * a * c;
+	if (discriminant < 0)
+		return (0);
+	inter->t1 = (-b - sqrt(discriminant)) / (2 * a); // smaller
+	inter->t2 = (-b + sqrt(discriminant)) / (2 * a); // bigger
+	return (1);
+}
+
+int	get_min_intersection(double *ret, t_inter i)
+{
+	if (i.t1 <= 1 && i.t2 <= 1)
+		return (0);
+	*ret = i.t2;
+	if (i.t1 > 1)
+		*ret = i.t1;
+	return (1);
+}
+
+int	intersect_sphere(t_ray ray, t_sp sp, double	*t)
+{
+	t_inter		*i;
+	t_circle	p;
+
+	p.center = sp.coord;
+	p.radius = sp.diameter / 2;
+	return (intersect_circle(ray, p, i) && get_min_intersection(t, *i));
+}
+
+t_vec	ray_pos(t_ray ray, double t)
+{
+	return (vec_add(ray.pos, vec_scale(ray.dir, t)));
+}
+
+int	intersect_cylinder(t_ray ray, t_cy cy, double *t) // ray랑 normal이랑 평행한 지 확인해야 한다., get_min_intersection을 체크하는 함수 포인터를 전달한다.
+{
+	t_inter	inter1;
+	t_inter	inter2;
+	double	t1;
+	double	t2;
+
+	if (fabs(vec_len(vec_proj(vec_normalize(ray.dir), cy.norm)) - 1) < 1e-6)
+	{
+		if (!intersect_caps(ray, cy, &inter2)
+			|| !get_min_intersection(&t2, inter2))
+			return (0);
+		*t = t2;
+		return (1);
+	}
+	if (!intersect_body(ray, cy, &inter1))
+		return (0);
+	get_min_intersection(&t1, inter1);
+	inter2.t1 = 0;
+	inter2.t2 = 0;
+	intersect_caps(ray, cy, &inter2);
+	get_min_intersection(&t2, inter2);
+	if (!get_min_intersection(&t, (t_inter){t1, t2}))
+		return (0);
+	return (1);		
+}
+// unit vector check
+// cylinder is infinite.
+int	intersect_body(t_ray ray, t_cy cy, t_inter *inter)
+{
+	t_vec		c_perp;
+	t_ray		r_perp;
+	double		proj_t1;
+	double		proj_t2;
+
+	c_perp = vec_sub(cy.coord, vec_proj(cy.coord, cy.norm));
+	r_perp.pos = vec_sub(ray.pos, vec_proj(ray.pos, cy.norm));
+	r_perp.dir = vec_sub(ray.dir, vec_proj(ray.dir, cy.norm));
+	if (!intersect_circle(r_perp, (t_circle){c_perp, cy.diameter / 2}, inter))
+		return (0);
+	proj_t1 = vec_len(vec_proj(vec_sub(ray_pos(ray, inter->t1), cy.coord), cy.norm));
+	proj_t2 = vec_len(vec_proj(vec_sub(ray_pos(ray, inter->t2), cy.coord), cy.norm));
+	if (proj_t1 < 0 || cy.height < proj_t1)
+		inter->t1 = -1;
+	if (proj_t2 < 0 || cy.height < proj_t2)
+		inter->t2 = -1;
+	return (1);
+}
+
+int	intersect_caps(t_ray ray, t_cy cy, t_inter *inter)
+{
+	double	bottom;
+	double	top;
+	double	c_to_t1;
+	double	c_to_t2;
+	double	radius;
+
+	bottom = vec_len(vec_proj(cy.coord, cy.norm));
+	top = bottom + cy.height;
+	inter->t1 = (bottom - vec_len(vec_proj(ray.pos, cy.norm)))
+		/ vec_len(vec_proj(ray.dir, cy.norm));
+	inter->t2 = (top - vec_len(vec_proj(ray.pos, cy.norm)))
+		/ vec_len(vec_proj(ray.dir, cy.norm));
+	c_to_t1 = vec_len(vec_sub(ray_pos(ray, inter->t1), cy.coord));
+	c_to_t2 = vec_len(vec_sub(ray_pos(ray, inter->t2), vec_add(
+			cy.coord, vec_scale(cy.norm, cy.height))));
+	radius = cy.diameter / 2;
+	if (c_to_t1 >= radius && c_to_t2 >= radius)
+		return (0);
+	if (c_to_t1 >= radius)
+		inter->t1 = -1;
+	if (c_to_t2 >= radius)
+		inter->t2 = -1;
+	return (1);
+}
+
+int	intersect_plane(t_ray ray, t_pl pl, double *t)
+{
+	double	ray_pl_dot;
+
+	ray_pl_dot = vec_dot(ray.pos, pl.norm);
+	if (ray_pl_dot < 1e-6)
+		return (0);
+	*t = vec_dot(vec_sub(pl.coord, ray.pos), pl.norm) / ray_pl_dot;
+	return (1);
+}
+
+void	check_sp(t_ray ray, t_node *sp, t_obj *obj, double initial)
+{
+	double	cur;
+	double	t;
+
+	if (!sp)
+		return ;
+	t = initial;
+	while (sp->data)
+	{
+		if (intersect_sphere(ray, *((t_sp *)(sp->data)), &cur) && cur < t)
+		{
+			t = cur;
+			obj->type = SPHERE;
+			obj->object = (t_sp *)(sp->data);
+		}
+	}
+	obj->t = t;
+}
+
+void	check_cy(t_ray ray, t_node *cy, t_obj *obj, double initial)
+{
+	double	cur;
+	double	t;
+
+	if (!cy)
+		return ;
+	t = initial;
+	while (cy->data)
+	{
+		if (intersect_cylinder(ray, *((t_cy *)(cy->data)), &cur) && cur < t)
+		{
+			t = cur;
+			obj->type = CYLINDER;
+			obj->object = (t_cy *)(cy->data);
+		}
+	}
+	obj->t = t;
+}
+
+void	check_pl(t_ray ray, t_node *pl, t_obj *obj, double initial)
+{
+	double	cur;
+	double	t;
+
+	if (!pl)
+		return ;
+	t = initial;
+	while (pl->data)
+	{
+		if (intersect_plane(ray, *((t_pl *)(pl->data)), &cur) && cur < t)
+		{
+			t = cur;
+			obj->type = PLANE;
+			obj->object = (t_pl *)(pl->data);
+		}
+	}
+	obj->t = t;
+}
+
+int	intersect(t_ray ray, t_rt_info info, t_obj *obj)
+{
+	obj->type = 0;
+	obj->t = INFINITY;
+	check_sp(ray, info.sp, obj, obj->t);
+	check_cy(ray, info.cy, obj, obj->t);
+	check_pl(ray, info.pl, obj, obj->t);
+    return (obj->type);
 }
 
 int	open_file(char *path)
