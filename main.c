@@ -12,8 +12,25 @@
 #define	PLANE		3
 //#define	INFINITY	1e500
 /*
-추가
-구, 원기둥, 평면과 광선의 교점에서의 t를 찾는 함수들 및 그에 필요한 여러 구조체들 (t는 광선에 대한 식인 o + td에서의 t. o와 d는 각각 광원의 위치, 광선의 방향 벡터)
+removed
+- t_circle structure
+- intersect_circle function
+- ray_pos function
+- intersect_body function
+- intersect_caps function
+- get_min_intersection function
+
+updated
+- intersect_sphere (intersect_circle is merged here.)
+- intersect_cylinder, cal_cy_body, cal_cy_caps (new algorithm.)
+- t_intersection sturcture members' name
+
+added
+- t_equation structure
+- solve_equation function
+- choose_smaller_t function
+- is_valid_t1, is_valid_t2, is_valid_t3, is_valid_t4 functions
+
 */
 typedef struct s_rgb
 {
@@ -106,15 +123,23 @@ typedef struct s_ray
 
 typedef struct s_intersection
 {
-	double	t1;
-	double	t2;
+	double	l;
+	double	r;
 }	t_inter;
 
-typedef struct s_circle
+// typedef struct s_circle
+// {
+// 	t_coord	center;
+// 	double	radius;
+// }	t_circle;
+
+typedef struct s_equation
 {
-	t_coord	center;
-	double	radius;
-}	t_circle;
+	double	a;
+	double	b;
+	double	c;
+}	t_equation;
+
 
 int	check_rgb(t_rgb rgb)
 {
@@ -469,128 +494,245 @@ t_vec	vec_proj(t_vec v1, t_vec v2)
 	return ((t_vec){v2.x * scalar, v2.y * scalar, v2.z * scalar});
 }
 
-int	intersect_circle(t_ray ray, t_circle cir, t_inter *inter)
-{
-	double		a;
-	double		b;
-	double		c;
-	double		discriminant;
-	t_vec		origin_to_center;
+// int	get_min_intersection(double *ret, t_inter i)
+// {
+// 	if (i.l <= 1 && i.r <= 1)
+// 		return (0);
+// 	*ret = i.r;
+// 	if (i.l > 1)
+// 		*ret = i.l;
+// 	return (1);
+// }
 
-	origin_to_center = vec_sub(ray.pos, cir.center);
-	a = vec_dot(ray.dir, ray.dir);
-	b = 2 * vec_dot(origin_to_center, ray.dir);
-	c = vec_dot(origin_to_center, origin_to_center) - pow(cir.radius, 2);
-	discriminant = b * b - 4 * a * c;
-	if (discriminant < 0)
-		return (0);
-	inter->t1 = (-b - sqrt(discriminant)) / (2 * a); // smaller
-	inter->t2 = (-b + sqrt(discriminant)) / (2 * a); // bigger
-	return (1);
+double	choose_smaller_t(double current, double candidate, int condition)
+{
+	if (!condition || current < candidate)
+		return (current);
+	return (candidate);
 }
 
-int	get_min_intersection(double *ret, t_inter i)
+// int	intersect_circle(t_ray ray, t_circle cir, t_inter *inter) // rename this to cal_sphere_t
+// {
+// 	double		a;
+// 	double		b;
+// 	double		c;
+// 	double		discriminant;
+// 	t_vec		ray_sp;
+
+// 	ray_sp = vec_sub(ray.pos, cir.center);
+// 	a = vec_dot(ray.dir, ray.dir);
+// 	b = 2 * vec_dot(ray_sp, ray.dir);
+// 	c = vec_dot(ray_sp, ray_sp) - pow(cir.radius, 2);
+// 	discriminant = b * b - 4 * a * c;
+// 	if (discriminant < 0)
+// 		return (0);
+// 	inter->l = (-b - sqrt(discriminant)) / (2 * a); // smaller
+// 	inter->r = (-b + sqrt(discriminant)) / (2 * a); // bigger
+// 	return (1);
+// }
+
+// int	intersect_sphere(t_ray ray, t_sp sp, double *t)// rename this to get_sphere_t and remove t_circle things.
+// {
+// 	t_inter		*i;
+// 	t_circle	p;
+
+// 	p.center = sp.coord;
+// 	p.radius = sp.diameter / 2;
+// 	return (intersect_circle(ray, p, i) && get_min_intersection(t, *i));
+// }
+
+void	solve_equation(t_equation eq, t_inter *inter)
 {
-	if (i.t1 <= 1 && i.t2 <= 1)
-		return (0);
-	*ret = i.t2;
-	if (i.t1 > 1)
-		*ret = i.t1;
-	return (1);
-}
+	double	d;
 
-int	intersect_sphere(t_ray ray, t_sp sp, double	*t)
-{
-	t_inter		*i;
-	t_circle	p;
-
-	p.center = sp.coord;
-	p.radius = sp.diameter / 2;
-	return (intersect_circle(ray, p, i) && get_min_intersection(t, *i));
-}
-
-t_vec	ray_pos(t_ray ray, double t)
-{
-	return (vec_add(ray.pos, vec_scale(ray.dir, t)));
-}
-
-int	intersect_cylinder(t_ray ray, t_cy cy, double *t) // ray랑 normal이랑 평행한 지 확인해야 한다., get_min_intersection을 체크하는 함수 포인터를 전달한다.
-{
-	t_inter	inter1;
-	t_inter	inter2;
-	double	t1;
-	double	t2;
-
-	if (fabs(vec_len(vec_proj(vec_normalize(ray.dir), cy.norm)) - 1) < 1e-6)
+	d = eq.b * eq.b - 4 * eq.a * eq.c;
+	if (!d)
 	{
-		if (!intersect_caps(ray, cy, &inter2)
-			|| !get_min_intersection(&t2, inter2))
-			return (0);
-		*t = t2;
-		return (1);
+		inter->l = HUGE_VAL; // 
+		inter->r = HUGE_VAL; // is it possible to use HUGE_VAL constant?
 	}
-	if (!intersect_body(ray, cy, &inter1))
-		return (0);
-	get_min_intersection(&t1, inter1);
-	inter2.t1 = 0;
-	inter2.t2 = 0;
-	intersect_caps(ray, cy, &inter2);
-	get_min_intersection(&t2, inter2);
-	if (!get_min_intersection(&t, (t_inter){t1, t2}))
-		return (0);
-	return (1);		
+	inter->l = (-eq.b - sqrt(d)) / (2 * eq.a);
+	inter->r = (-eq.b + sqrt(d)) / (2 * eq.a); // it is not necessary to compare l and r here.
 }
-// unit vector check
-// cylinder is infinite.
-int	intersect_body(t_ray ray, t_cy cy, t_inter *inter)
+
+int	intersect_sphere(t_ray ray, t_sp sp, double *t)// rename this to get_sphere_t and remove t_circle things.
 {
-	t_vec		c_perp;
-	t_ray		r_perp;
-	double		proj_t1;
-	double		proj_t2;
+	t_inter		inter;
+	t_equation	eq;
+	t_vec		ray_sp;
+	double		ret;
 
-	c_perp = vec_sub(cy.coord, vec_proj(cy.coord, cy.norm));
-	r_perp.pos = vec_sub(ray.pos, vec_proj(ray.pos, cy.norm));
-	r_perp.dir = vec_sub(ray.dir, vec_proj(ray.dir, cy.norm));
-	if (!intersect_circle(r_perp, (t_circle){c_perp, cy.diameter / 2}, inter))
-		return (0);
-	proj_t1 = vec_len(vec_proj(vec_sub(ray_pos(ray, inter->t1), cy.coord), cy.norm));
-	proj_t2 = vec_len(vec_proj(vec_sub(ray_pos(ray, inter->t2), cy.coord), cy.norm));
-	if (proj_t1 < 0 || cy.height < proj_t1)
-		inter->t1 = -1;
-	if (proj_t2 < 0 || cy.height < proj_t2)
-		inter->t2 = -1;
-	return (1);
+	ray_sp = vec_sub(ray.pos, sp.coord);
+	eq.a = vec_dot(ray.dir, ray.dir);
+	eq.b = 2 * vec_dot(ray_sp, ray.dir);
+	eq.c = vec_dot(ray_sp, ray_sp) - pow(sp.diameter / 2, 2);
+	solve_equation(eq, &inter);
+	ret = choose_smaller_t(HUGE_VAL, inter.l, (1 < inter.l));
+	ret = choose_smaller_t(*t, inter.r, (1 < inter.r));
+	*t = ret;
+	return (ret != HUGE_VAL);
 }
 
-int	intersect_caps(t_ray ray, t_cy cy, t_inter *inter)
+void	cal_cy_body(t_ray ray, t_cy cy, t_inter *inter)
 {
-	double	bottom;
-	double	top;
-	double	c_to_t1;
-	double	c_to_t2;
-	double	radius;
+	t_equation	eq;
+	t_vec		vec_dir;
+	t_vec		vec_pos;
+	t_vec		cy_ray;
 
-	bottom = vec_len(vec_proj(cy.coord, cy.norm));
-	top = bottom + cy.height;
-	inter->t1 = (bottom - vec_len(vec_proj(ray.pos, cy.norm)))
-		/ vec_len(vec_proj(ray.dir, cy.norm));
-	inter->t2 = (top - vec_len(vec_proj(ray.pos, cy.norm)))
-		/ vec_len(vec_proj(ray.dir, cy.norm));
-	c_to_t1 = vec_len(vec_sub(ray_pos(ray, inter->t1), cy.coord));
-	c_to_t2 = vec_len(vec_sub(ray_pos(ray, inter->t2), vec_add(
-			cy.coord, vec_scale(cy.norm, cy.height))));
-	radius = cy.diameter / 2;
-	if (c_to_t1 >= radius && c_to_t2 >= radius)
-		return (0);
-	if (c_to_t1 >= radius)
-		inter->t1 = -1;
-	if (c_to_t2 >= radius)
-		inter->t2 = -1;
-	return (1);
+	vec_dir = vec_sub(ray.dir, vec_scale(cy.norm, vec_dot(ray.dir, cy.norm)));
+	cy_ray = vec_sub(ray.pos, cy.coord);
+	vec_pos = vec_sub(cy_ray, vec_scale(cy.norm, vec_dot(cy_ray, cy.norm)));
+	eq.a = vec_dot(vec_dir, vec_dir);
+	eq.b = 2 * vec_dot(vec_dir, vec_pos);
+	eq.c = vec_dot(vec_pos, vec_pos) - pow(cy.diameter / 2, 2);
+	solve_equation(eq, inter);
 }
 
-int	intersect_plane(t_ray ray, t_pl pl, double *t)
+void	cal_cy_caps(t_ray ray, t_cy cy, t_inter *inter)
+{
+	t_vec	bottom_center;
+	t_vec	top_center;
+	double	n_dot_dir;
+
+	bottom_center = cy.coord;
+	top_center = vec_add(cy.coord, vec_scale(cy.norm, cy.height));
+	n_dot_dir = vec_dot(cy.norm, ray.dir);
+	inter->l = vec_dot(cy.norm, vec_sub(ray.pos, bottom_center)) / n_dot_dir;
+	inter->r = vec_dot(cy.norm, vec_sub(ray.pos, top_center)) / n_dot_dir;
+}
+int	is_valid_t1(t_cy cy, t_ray ray, double t)
+{
+	return (t >= 0 && vec_dot(cy.norm, vec_sub(
+		vec_add(ray.pos, vec_scale(ray.dir, t)), cy.coord)) > 0);
+}
+
+int	is_valid_t2(t_cy cy, t_ray ray, double t)
+{
+	return (t >= 0 && vec_dot(cy.norm, vec_sub(
+		vec_add(ray.pos, vec_scale(ray.dir, t)),
+		vec_add(cy.coord, vec_scale(cy.norm, cy.height)))) > 0);
+}
+
+int	is_valid_t3(t_cy cy, t_ray ray, double t)
+{
+	t_vec	q_to_cap;
+
+	q_to_cap = vec_sub(vec_add(ray.pos, vec_scale(ray.dir, t)),
+		cy.coord);
+	return (t >= 0 && vec_dot(q_to_cap, q_to_cap) < pow(cy.diameter / 2, 2));
+}
+
+int	is_valid_t4(t_cy cy, t_ray ray, double t)
+{
+	t_vec	q_to_cap;
+
+	q_to_cap = vec_sub(vec_add(ray.pos, vec_scale(ray.dir, t)),
+		vec_add(cy.coord, vec_scale(cy.norm, cy.height)));
+	return (t >= 0 && vec_dot(q_to_cap, q_to_cap) < pow(cy.diameter / 2, 2));
+}
+// t1 : nonnegative, vec_dot(cy.norm, vec_sub(q, p1)) > 0
+// t2 : nonnegative, vec_dot(cy.norm, vec_sub(q, p2)) < 0
+// t3 : nonnegative, vec_dot(vec_sub(q, p1), vec_sub(q, p1)) < r^2
+// t4 : nonnegative, vec_dot(vec_sub(q, p2), vec_sub(q, p2)) < r^2
+int	intersect_cylinder(t_ray ray, t_cy cy, double *t)// rename this to get_cylinder_t
+{
+	t_inter		t_1_2;
+	t_inter		t_3_4;
+	double		ret;
+
+	cal_cy_body(ray, cy, &t_1_2);
+	cal_cy_body(ray, cy, &t_3_4);
+	ret = choose_smaller_t(HUGE_VAL, t_1_2.l, is_valid_t1(cy, ray, t_1_2.l));
+	ret = choose_smaller_t(ret, t_1_2.r, is_valid_t2(cy, ray, t_1_2.r));
+	ret = choose_smaller_t(ret, t_3_4.l, is_valid_t3(cy, ray, t_3_4.l));
+	ret = choose_smaller_t(ret, t_3_4.r, is_valid_t4(cy, ray, t_3_4.r));
+	*t = ret;
+	return (ret != HUGE_VAL);
+}
+
+// t_vec	ray_pos(t_ray ray, double t)
+// {
+// 	return (vec_add(ray.pos, vec_scale(ray.dir, t)));
+// }
+
+// int	intersect_cylinder(t_ray ray, t_cy cy, double *t) // ray랑 normal이랑 평행한 지 확인해야 한다., get_min_intersection을 체크하는 함수 포인터를 전달한다.
+// {
+// 	t_inter	inter1;
+// 	t_inter	inter2;
+// 	double	l;
+// 	double	r;
+
+// 	if (fabs(vec_len(vec_proj(vec_normalize(ray.dir), cy.norm)) - 1) < 1e-6)
+// 	{
+// 		if (!intersect_caps(ray, cy, &inter2)
+// 			|| !get_min_intersection(&r, inter2))
+// 			return (0);
+// 		*t = r;
+// 		return (1);
+// 	}
+// 	if (!intersect_body(ray, cy, &inter1))
+// 		return (0);
+// 	get_min_intersection(&l, inter1);
+// 	inter2.l = 0;
+// 	inter2.r = 0;
+// 	intersect_caps(ray, cy, &inter2);
+// 	get_min_intersection(&r, inter2);
+// 	if (!get_min_intersection(&t, (t_inter){l, r}))
+// 		return (0);
+// 	return (1);		
+// }
+// // unit vector check
+// // cylinder is infinite.
+// int	intersect_body(t_ray ray, t_cy cy, t_inter *inter)
+// {
+// 	t_vec		c_perp;
+// 	t_ray		r_perp;
+// 	double		proj_t1;
+// 	double		proj_t2;
+
+// 	c_perp = vec_sub(cy.coord, vec_proj(cy.coord, cy.norm));
+// 	r_perp.pos = vec_sub(ray.pos, vec_proj(ray.pos, cy.norm));
+// 	r_perp.dir = vec_sub(ray.dir, vec_proj(ray.dir, cy.norm));
+// 	if (!intersect_circle(r_perp, (t_circle){c_perp, cy.diameter / 2}, inter))
+// 		return (0);
+// 	proj_t1 = vec_len(vec_proj(vec_sub(ray_pos(ray, inter->l), cy.coord), cy.norm));
+// 	proj_t2 = vec_len(vec_proj(vec_sub(ray_pos(ray, inter->r), cy.coord), cy.norm));
+// 	if (proj_t1 < 0 || cy.height < proj_t1)
+// 		inter->l = -1;
+// 	if (proj_t2 < 0 || cy.height < proj_t2)
+// 		inter->r = -1;
+// 	return (1);
+// }
+
+// int	intersect_caps(t_ray ray, t_cy cy, t_inter *inter)
+// {
+// 	double	bottom;
+// 	double	top;
+// 	double	c_to_t1;
+// 	double	c_to_t2;
+// 	double	radius;
+
+// 	bottom = vec_len(vec_proj(cy.coord, cy.norm));
+// 	top = bottom + cy.height;
+// 	inter->l = (bottom - vec_len(vec_proj(ray.pos, cy.norm)))
+// 		/ vec_len(vec_proj(ray.dir, cy.norm));
+// 	inter->r = (top - vec_len(vec_proj(ray.pos, cy.norm)))
+// 		/ vec_len(vec_proj(ray.dir, cy.norm));
+// 	c_to_t1 = vec_len(vec_sub(ray_pos(ray, inter->l), cy.coord));
+// 	c_to_t2 = vec_len(vec_sub(ray_pos(ray, inter->r), vec_add(
+// 			cy.coord, vec_scale(cy.norm, cy.height))));
+// 	radius = cy.diameter / 2;
+// 	if (c_to_t1 >= radius && c_to_t2 >= radius)
+// 		return (0);
+// 	if (c_to_t1 >= radius)
+// 		inter->l = -1;
+// 	if (c_to_t2 >= radius)
+// 		inter->r = -1;
+// 	return (1);
+// }
+
+int	intersect_plane(t_ray ray, t_pl pl, double *t) //rename this to get_plane_t
 {
 	double	ray_pl_dot;
 
