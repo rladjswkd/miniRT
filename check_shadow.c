@@ -54,11 +54,8 @@ t_ray	get_l_ray(t_light l, t_ray ray, t_obj	obj)
 	return (l_ray);
 }
 
-int	check_shadow(t_rt_info info, t_ray ray,t_obj obj)
+int	check_shadow(t_rt_info info, t_ray l_ray)
 {
-	t_ray	l_ray;
-
-	l_ray = get_l_ray(info.l, ray, obj);
 	if (check_shadow_sp(l_ray, info.sp))
 		return (1);
 	if (check_shadow_cy(l_ray, info.cy))
