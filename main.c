@@ -6,15 +6,41 @@
 #include <math.h>
 #include "converter.h"
 #include "checker.h"
+#include "mlx.h"
 
 #define SPHERE		1
 #define	CYLINDER	2
 #define	PLANE		3
+#define ESC_KEY		53
+#define LEFT			123
+#define UP				126
+#define RIGHT			124
+#define DOWN			125
+#define P_WID 1280
+#define P_HEI 720
+
 //#define	INFINITY	1e500
 /*
 추가
 구, 원기둥, 평면과 광선의 교점에서의 t를 찾는 함수들 및 그에 필요한 여러 구조체들 (t는 광선에 대한 식인 o + td에서의 t. o와 d는 각각 광원의 위치, 광선의 방향 벡터)
 */
+
+typedef struct s_img
+{
+	void	*ptr;
+	char	*addr;
+	int		bits_per_pixel;
+	int		line_length;
+	int		endian;
+}	t_img;
+
+typedef struct s_vars
+{
+	void		*mlx;
+	void		*win;
+	t_img		img;
+}	t_vars;
+
 typedef struct s_rgb
 {
 	int	r;
@@ -126,6 +152,24 @@ int	check_rgb(t_rgb rgb)
 	g = rgb.g;
 	b = rgb.b;
 	return (-1 < r && r < 256 && -1 < g && g < 256 && -1 < b && b < 256);
+}
+
+int	init_mlx_pointers(t_vars *vars)
+{
+	vars->mlx = mlx_init();
+	if (!vars->mlx)
+		return (0);
+	vars->win = mlx_new_window(vars->mlx, P_WID, P_HEI, "miniRT");
+	if (!vars->win)
+		return (0);
+	vars->img.ptr = mlx_new_image(vars->mlx, P_WID, P_HEI);
+	if (!vars->img.ptr)
+		return (0);
+	vars->img.addr = mlx_get_data_addr(vars->img.ptr, &vars->img.bits_per_pixel,
+			&vars->img.line_length, &vars->img.endian);
+	if (!vars->img.addr)
+		return (0);
+	return (1);
 }
 
 int	check_normal(t_vec vec)
@@ -514,34 +558,6 @@ t_vec	ray_pos(t_ray ray, double t)
 	return (vec_add(ray.pos, vec_scale(ray.dir, t)));
 }
 
-int	intersect_cylinder(t_ray ray, t_cy cy, double *t) // ray랑 normal이랑 평행한 지 확인해야 한다., get_min_intersection을 체크하는 함수 포인터를 전달한다.
-{
-	t_inter	inter1;
-	t_inter	inter2;
-	double	t1;
-	double	t2;
-
-	if (fabs(vec_len(vec_proj(vec_normalize(ray.dir), cy.norm)) - 1) < 1e-6)
-	{
-		if (!intersect_caps(ray, cy, &inter2)
-			|| !get_min_intersection(&t2, inter2))
-			return (0);
-		*t = t2;
-		return (1);
-	}
-	if (!intersect_body(ray, cy, &inter1))
-		return (0);
-	get_min_intersection(&t1, inter1);
-	inter2.t1 = 0;
-	inter2.t2 = 0;
-	intersect_caps(ray, cy, &inter2);
-	get_min_intersection(&t2, inter2);
-	if (!get_min_intersection(&t, (t_inter){t1, t2}))
-		return (0);
-	return (1);		
-}
-// unit vector check
-// cylinder is infinite.
 int	intersect_body(t_ray ray, t_cy cy, t_inter *inter)
 {
 	t_vec		c_perp;
@@ -589,6 +605,36 @@ int	intersect_caps(t_ray ray, t_cy cy, t_inter *inter)
 		inter->t2 = -1;
 	return (1);
 }
+
+int	intersect_cylinder(t_ray ray, t_cy cy, double *t) // ray랑 normal이랑 평행한 지 확인해야 한다., get_min_intersection을 체크하는 함수 포인터를 전달한다.
+{
+	t_inter	inter1;
+	t_inter	inter2;
+	double	t1;
+	double	t2;
+
+	if (fabs(vec_len(vec_proj(vec_normalize(ray.dir), cy.norm)) - 1) < 1e-6)
+	{
+		if (!intersect_caps(ray, cy, &inter2)
+			|| !get_min_intersection(&t2, inter2))
+			return (0);
+		*t = t2;
+		return (1);
+	}
+	if (!intersect_body(ray, cy, &inter1))
+		return (0);
+	get_min_intersection(&t1, inter1);
+	inter2.t1 = 0;
+	inter2.t2 = 0;
+	intersect_caps(ray, cy, &inter2);
+	get_min_intersection(&t2, inter2);
+	if (!get_min_intersection(t, (t_inter){t1, t2}))
+		return (0);
+	return (1);		
+}
+// unit vector check
+// cylinder is infinite.
+
 
 int	intersect_plane(t_ray ray, t_pl pl, double *t)
 {
@@ -720,13 +766,215 @@ int	read_file(int fd, t_rt_info *rt_info)
 	return (1);
 }
 
+int	check_shadow_sp(t_ray ray, t_node *sp)
+{
+	double	cur;
+
+	cur = 2;
+	if (!sp)
+		return (0);
+	while (sp->data)
+	{
+		if (intersect_sphere(ray, *((t_sp *)(sp->data)), &cur) && cur < 2)
+			return (1);
+	}
+	return (0);
+}
+
+/////////////////////////////////////////////////////check_shadow
+int	check_shadow_cy(t_ray ray, t_node *cy)
+{
+	double	cur;
+
+	cur = 2;
+	if (!cy)
+		return (0);
+	while (cy->data)
+	{
+		if (intersect_cylinder(ray, *((t_cy *)(cy->data)), &cur) && cur < 2)
+			return (1);
+	}
+	return (0);
+}
+
+int	check_shadow_pl(t_ray ray, t_node *pl)
+{
+	double	cur;
+
+	cur = 2;
+	if (!pl)
+		return (0);
+	while (pl->data)
+	{
+		if (intersect_plane(ray, *((t_pl *)(pl->data)), &cur) && cur < 2)
+			return (1);
+	}
+	return (0);
+}
+
+t_ray	get_l_ray(t_light l, t_ray ray, t_obj	obj)
+{
+	t_ray	l_ray;
+	t_vec	t_pos;
+
+	t_pos = vec_add(vec_scale(ray.dir, obj.t), ray.pos);
+	l_ray.dir = vec_sub(l.coord, t_pos);
+	l_ray.pos = vec_sub(t_pos, l_ray.dir);
+	return (l_ray);
+}
+
+int	check_shadow(t_rt_info info, t_ray l_ray)
+{
+	if (check_shadow_sp(l_ray, info.sp))
+		return (1);
+	if (check_shadow_cy(l_ray, info.cy))
+		return (1);
+	if (check_shadow_pl(l_ray, info.pl))
+		return (1);
+	return (0);
+}
+
+/////////////////////////////////////////////////////
+typedef struct s_pixel_info
+{
+	t_coord	top_left;
+	t_vec	p_h;
+	t_vec	p_v;
+}	t_p_info;
+/////////////////////////////////////////////////////
+
+t_vec	get_ab_vec(t_vec v)
+{
+	t_vec	ret;
+
+	if (v.x == 0 && v.y == 0 && (v.z == 1 || v.z == -1))
+	{
+		ret.x = 1;
+		ret.y = 0;
+		ret.z = 0;
+	}
+	else
+	{
+		ret.x = 0;
+		ret.y = 0;
+		ret.z = 1;
+	}
+	return (ret);
+}
+
+void	get_pixel_info(t_camera c, t_p_info *p_info)
+{
+	t_vec	h;
+	t_vec	v;
+	t_vec	tmp;
+	double	vp_h;
+	double	vp_w;
+
+	vp_w = tan((c.fov * M_PI / 180.0) / 2.0) * 2;
+	vp_h = vp_w * ((double)P_HEI / (double)P_WID);
+	h = vec_cross(c.norm, get_ab_vec(c.norm));
+	v = vec_cross(c.norm, h);
+	h = vec_scale(h, (double)1 / vec_len(h) * (vp_w / (double)P_WID));
+	v = vec_scale(v, (double)1 / vec_len(v) * (vp_h / (double)P_HEI));
+	p_info->p_h = h;
+	p_info->p_v = v;
+	tmp = vec_add(c.coord, c.norm);
+	tmp = vec_sub(tmp, vec_scale(h, (double)P_WID / (double)2));
+	tmp = vec_sub(tmp, vec_scale(v, (double)P_HEI / (double)2));
+	p_info->top_left = tmp;
+}
+
+/////////////////////////////////////////////////////
+t_ray	generate_ray(t_coord pos, t_p_info p_info, int i, int j)
+{
+	t_ray	ret;
+	t_coord	tmp;
+
+	ret.pos = pos;
+	tmp = p_info.top_left;
+	tmp = vec_add(tmp, vec_scale(p_info.p_h, i));
+	tmp = vec_add(tmp, vec_scale(p_info.p_v, j));
+	ret.dir = vec_sub(tmp, pos);
+	return (ret);
+}
+
+t_rgb	get_obj_rgb(t_obj obj, double intensity)
+{
+	t_rgb	ret;
+
+	if (obj.type == SPHERE)
+		ret = ((t_sp *)obj.object)->rgb;
+	else if (obj.type == CYLINDER)
+		ret = ((t_cy *)obj.object)->rgb;
+	else
+		ret = ((t_pl *)obj.object)->rgb;
+	ret.r = ret.r * intensity;
+	ret.g = ret.g * intensity;
+	ret.b = ret.b * intensity;
+	return (ret);
+}
+
+void	dot_pixel(t_img *img, t_rgb color, int i)
+{
+	int	pixel;
+
+	pixel = i * 4;
+	img->addr[pixel] = color.r;
+	img->addr[pixel + 1] = color.g;
+	img->addr[pixel + 2] = color.b;
+}
+
+int	ray_trace(t_img *img, t_rt_info *rt_info, t_ray ray, int i)
+{
+	t_obj	obj;
+	t_ray	l_ray;
+	t_rgb	color;
+
+	if (intersect(ray, *rt_info, &obj))
+		return (0);
+	l_ray = get_l_ray(rt_info->l, ray, obj);
+	if (check_shadow(*rt_info, l_ray))
+	{
+		//default
+		return (0);
+	}
+	color = get_obj_rgb(obj, rt_info->a.intensity);
+	dot_pixel(img, color, i);
+	return (0);
+}
+/////////////////////////////////////////////////////
+
+int draw_img(t_rt_info *rt_info, t_vars *vars)
+{
+	t_p_info	p_info;
+	t_ray		ray;
+	int			i;
+	int			j;
+
+	get_pixel_info(rt_info->c, &p_info);
+	i = -1;
+	while (++i < P_HEI)
+	{
+		j = -1;
+		while (++j < P_WID)
+		{
+			ray = generate_ray(rt_info->c.coord, p_info, i, j);
+			ray_trace(&vars->img, rt_info, ray, i * P_HEI + j);
+		}
+	}
+	mlx_put_image_to_window(vars->mlx, vars->win, vars->img.ptr, 0, 0);
+	return (1);
+}
+
 int	main(int argc, char **argv)
 {
 	int			fd;
 	t_rt_info	rt_info;
+	t_vars		vars;
 
 	if (argc != 2)
 		return (0); // call error handling function with proper error message.
+	init_mlx_pointers(&vars);
 	fd = open_file(argv[1]);
 	if (fd < 0) // remove this when error handling function is completed.
 		return (0); // 에러 문자열 출력하고 처리해주기
@@ -738,8 +986,10 @@ int	main(int argc, char **argv)
 	else
 		printf("%s\n", "invalid format");
 	/* draw image */
+	draw_img(&rt_info, &vars);
 	clear_list(&(rt_info.sp));
 	clear_list(&(rt_info.pl));
 	clear_list(&(rt_info.cy));
+	mlx_loop(vars.mlx);
 	return (0);
 }
