@@ -11,27 +11,7 @@
 #define	CYLINDER	2
 #define	PLANE		3
 //#define	INFINITY	1e500
-/*
-removed
-- t_circle structure
-- intersect_circle function
-- ray_pos function
-- intersect_body function
-- intersect_caps function
-- get_min_intersection function
 
-updated
-- intersect_sphere (intersect_circle is merged here.)
-- intersect_cylinder, cal_cy_body, cal_cy_caps (new algorithm.)
-- t_intersection sturcture members' name
-
-added
-- t_equation structure
-- solve_equation function
-- choose_smaller_t function
-- is_valid_t1, is_valid_t2, is_valid_t3, is_valid_t4 functions
-
-*/
 typedef struct s_rgb
 {
 	int	r;
@@ -550,6 +530,7 @@ void	solve_equation(t_equation eq, t_inter *inter)
 	{
 		inter->l = HUGE_VAL; // 
 		inter->r = HUGE_VAL; // is it possible to use HUGE_VAL constant?
+		return ;
 	}
 	inter->l = (-eq.b - sqrt(d)) / (2 * eq.a);
 	inter->r = (-eq.b + sqrt(d)) / (2 * eq.a); // it is not necessary to compare l and r here.
@@ -642,7 +623,7 @@ int	intersect_cylinder(t_ray ray, t_cy cy, double *t)// rename this to get_cylin
 	double		ret;
 
 	cal_cy_body(ray, cy, &t_1_2);
-	cal_cy_body(ray, cy, &t_3_4);
+	cal_cy_caps(ray, cy, &t_3_4);
 	ret = choose_smaller_t(HUGE_VAL, t_1_2.l, is_valid_t1(cy, ray, t_1_2.l));
 	ret = choose_smaller_t(ret, t_1_2.r, is_valid_t2(cy, ray, t_1_2.r));
 	ret = choose_smaller_t(ret, t_3_4.l, is_valid_t3(cy, ray, t_3_4.l));
