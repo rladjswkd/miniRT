@@ -625,9 +625,10 @@ void	cal_cy_caps(t_ray ray, t_cy cy, t_inter *inter)
 	bottom_center = cy.coord;
 	top_center = vec_add(cy.coord, vec_scale(cy.norm, cy.height));
 	n_dot_dir = vec_dot(cy.norm, ray.dir);
-	inter->l = vec_dot(cy.norm, vec_sub(ray.pos, bottom_center)) / n_dot_dir;
-	inter->r = vec_dot(cy.norm, vec_sub(ray.pos, top_center)) / n_dot_dir;
+	inter->l = vec_dot(cy.norm, vec_sub(bottom_center, ray.pos)) / n_dot_dir;
+	inter->r = vec_dot(cy.norm, vec_sub(top_center, ray.pos)) / n_dot_dir;
 }
+
 int	is_valid_t1(t_cy cy, t_ray ray, double t)
 {
 	return (t >= 0 && vec_dot(cy.norm, vec_sub(
@@ -638,7 +639,7 @@ int	is_valid_t2(t_cy cy, t_ray ray, double t)
 {
 	return (t >= 0 && vec_dot(cy.norm, vec_sub(
 		vec_add(ray.pos, vec_scale(ray.dir, t)),
-		vec_add(cy.coord, vec_scale(cy.norm, cy.height)))) > 0);
+		vec_add(cy.coord, vec_scale(cy.norm, cy.height)))) < 0);
 }
 
 int	is_valid_t3(t_cy cy, t_ray ray, double t)
