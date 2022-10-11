@@ -775,7 +775,7 @@ void	check_sp(t_ray ray, t_node *sp, t_obj *obj, double initial)
 	if (!sp)
 		return ;
 	t = initial;
-	while (sp->data)
+	while (sp)
 	{
 		if (intersect_sphere(ray, *((t_sp *)(sp->data)), &cur) && cur < t)
 		{
@@ -783,6 +783,7 @@ void	check_sp(t_ray ray, t_node *sp, t_obj *obj, double initial)
 			obj->type = SPHERE;
 			obj->object = (t_sp *)(sp->data);
 		}
+		sp = sp->next;
 	}
 	obj->t = t;
 }
@@ -795,7 +796,7 @@ void	check_cy(t_ray ray, t_node *cy, t_obj *obj, double initial)
 	if (!cy)
 		return ;
 	t = initial;
-	while (cy->data)
+	while (cy)
 	{
 		if (intersect_cylinder(ray, *((t_cy *)(cy->data)), &cur) && cur < t)
 		{
@@ -803,6 +804,7 @@ void	check_cy(t_ray ray, t_node *cy, t_obj *obj, double initial)
 			obj->type = CYLINDER;
 			obj->object = (t_cy *)(cy->data);
 		}
+		cy = cy->next;
 	}
 	obj->t = t;
 }
@@ -815,7 +817,7 @@ void	check_pl(t_ray ray, t_node *pl, t_obj *obj, double initial)
 	if (!pl)
 		return ;
 	t = initial;
-	while (pl->data)
+	while (pl)
 	{
 		if (intersect_plane(ray, *((t_pl *)(pl->data)), &cur) && cur < t)
 		{
@@ -823,6 +825,7 @@ void	check_pl(t_ray ray, t_node *pl, t_obj *obj, double initial)
 			obj->type = PLANE;
 			obj->object = (t_pl *)(pl->data);
 		}
+		pl = pl->next;
 	}
 	obj->t = t;
 }
@@ -893,10 +896,11 @@ int	check_shadow_sp(t_ray ray, t_node *sp)
 	cur = 2;
 	if (!sp)
 		return (0);
-	while (sp->data)
+	while (sp)
 	{
 		if (intersect_sphere(ray, *((t_sp *)(sp->data)), &cur) && cur < 2)
 			return (1);
+		sp = sp->next;
 	}
 	return (0);
 }
@@ -909,10 +913,11 @@ int	check_shadow_cy(t_ray ray, t_node *cy)
 	cur = 2;
 	if (!cy)
 		return (0);
-	while (cy->data)
+	while (cy)
 	{
 		if (intersect_cylinder(ray, *((t_cy *)(cy->data)), &cur) && cur < 2)
 			return (1);
+		cy = cy->next;
 	}
 	return (0);
 }
@@ -924,10 +929,11 @@ int	check_shadow_pl(t_ray ray, t_node *pl)
 	cur = 2;
 	if (!pl)
 		return (0);
-	while (pl->data)
+	while (pl)
 	{
 		if (intersect_plane(ray, *((t_pl *)(pl->data)), &cur) && cur < 2)
 			return (1);
+		pl = pl->next;
 	}
 	return (0);
 }
@@ -1044,13 +1050,13 @@ void	dot_pixel(t_img *img, t_rgb color, int i)
 	img->addr[pixel + 2] = color.b;
 }
 
-int	ray_trace(t_img *img, t_rt_info *rt_info, t_ray ray, int i)
+int	trace_ray(t_img *img, t_rt_info *rt_info, t_ray ray, int i)
 {
 	t_obj	obj;
 	t_ray	l_ray;
 	t_rgb	color;
 
-	if (intersect(ray, *rt_info, &obj))
+	if (!intersect(ray, *rt_info, &obj))
 		return (0);
 	l_ray = get_l_ray(rt_info->l, ray, obj);
 	if (check_shadow(*rt_info, l_ray))
@@ -1079,7 +1085,7 @@ int draw_img(t_rt_info *rt_info, t_vars *vars)
 		while (++j < P_WID)
 		{
 			ray = generate_ray(rt_info->c.coord, p_info, i, j);
-			ray_trace(&vars->img, rt_info, ray, i * P_HEI + j);
+			trace_ray(&vars->img, rt_info, ray, i * P_HEI + j);
 		}
 	}
 	mlx_put_image_to_window(vars->mlx, vars->win, vars->img.ptr, 0, 0);
