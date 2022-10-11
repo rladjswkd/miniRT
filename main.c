@@ -16,8 +16,8 @@
 #define UP				126
 #define RIGHT			124
 #define DOWN			125
-#define P_WID 1280
-#define P_HEI 720
+#define P_WID 999
+#define P_HEI 999
 
 //#define	INFINITY	1e500
 
@@ -512,9 +512,11 @@ t_vec	vec_normalize(t_vec vec)
 t_vec	vec_proj(t_vec v1, t_vec v2)
 {
 	double	scalar;
+	t_vec	n;
 
-	scalar = vec_dot(v1, v2) / vec_len(v2);
-	return ((t_vec){v2.x * scalar, v2.y * scalar, v2.z * scalar});
+	n = vec_normalize(v2);
+	scalar = vec_dot(v1, v2);
+	return ((t_vec){n.x * scalar, n.y * scalar, n.z * scalar});
 }
 
 // int	get_min_intersection(double *ret, t_inter i)
@@ -760,7 +762,7 @@ int	intersect_plane(t_ray ray, t_pl pl, double *t) //rename this to get_plane_t
 {
 	double	ray_pl_dot;
 
-	ray_pl_dot = vec_dot(ray.pos, pl.norm);
+	ray_pl_dot = vec_dot(ray.dir, pl.norm);
 	if (ray_pl_dot < 1e-6)
 		return (0);
 	*t = vec_dot(vec_sub(pl.coord, ray.pos), pl.norm) / ray_pl_dot;
@@ -847,11 +849,11 @@ double	compute_lighting(t_vec p, t_vec n, t_rt_info info) // only for diffuse re
 	double	n_dot_l;
 
 	lighting = info.a.intensity;
+	//check_shadow
 	p_to_l = vec_sub(info.l.coord, p);
 	n_dot_l = vec_dot(n, p_to_l);
 	if (n_dot_l > 0)
 		lighting += info.l.intensity * n_dot_l / (vec_len(n) * vec_len(p_to_l));
-	// shadow part should be added here
     return (lighting);
 }
 
@@ -1050,21 +1052,56 @@ void	dot_pixel(t_img *img, t_rgb color, int i)
 	img->addr[pixel + 2] = color.b;
 }
 
+t_vec	get_tangent_norm_cy(t_cy *cy, t_coord p)
+{
+	double	a;
+	double	b;
+	t_coord	t_c;
+
+	a = vec_dot(p, cy->norm);
+	b = vec_dot(vec_add(cy->coord, vec_scale(cy->norm, cy->height)), cy->norm);
+	if (fabs(a - b) == 0.001)
+		return (cy->norm);
+	b = vec_dot(cy->coord, cy->norm);
+	if (fabs(a - b) == 0.001)
+		return (vec_scale(cy->norm, -1));
+	t_c = vec_add(cy->coord, vec_scale(cy->norm, fabs(a - b)));
+	return (vec_normalize(vec_sub(p, t_c)));
+}
+
+t_vec	get_tangent_norm(t_obj	obj, t_coord p)
+{
+	t_vec	n;
+
+	if (obj.type == SPHERE)
+		n = vec_sub(p, ((t_sp *)obj.object)->coord);
+	else if (obj.type == CYLINDER)
+		n = get_tangent_norm_cy(obj.object, p);
+	else
+		n = ((t_pl *)obj.object)->norm;
+	return (n);
+}
+
 int	trace_ray(t_img *img, t_rt_info *rt_info, t_ray ray, int i)
 {
 	t_obj	obj;
 	t_ray	l_ray;
 	t_rgb	color;
+	t_coord	p;
+	t_vec	n;
 
 	if (!intersect(ray, *rt_info, &obj))
 		return (0);
-	l_ray = get_l_ray(rt_info->l, ray, obj);
-	if (check_shadow(*rt_info, l_ray))
-	{
-		//default
-		return (0);
-	}
-	color = get_obj_rgb(obj, rt_info->a.intensity);
+	//background color
+	p = vec_add(ray.pos, vec_scale(ray.dir, obj.t));
+	n = get_tangent_norm(obj, p);
+	// l_ray = get_l_ray(rt_info->l, ray, obj);
+	// if (check_shadow(*rt_info, l_ray))
+	// {
+	// 	//default
+	// 	return (0);
+	// }
+	color = get_obj_rgb(obj, compute_lighting(p, n, *rt_info));
 	dot_pixel(img, color, i);
 	return (0);
 }
