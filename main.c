@@ -20,6 +20,7 @@
 #define P_HEI 999
 
 //#define	INFINITY	1e500
+#define	S_EXP		100 // specular exponent
 
 typedef struct s_img
 {
@@ -841,20 +842,30 @@ int	intersect(t_ray ray, t_rt_info info, t_obj *obj)
 	check_pl(ray, info.pl, obj, obj->t);
     return (obj->type);
 }
-
-double	compute_lighting(t_vec p, t_vec n, t_rt_info info) // only for diffuse reflection, p_norm should be an unit vector
+// view is -camera_ray(same size)
+double	compute_lighting(t_vec inter, t_vec n, t_vec view, t_rt_info info) // only for diffuse reflection, p_norm should be an unit vector
 {
-	double	lighting;
-	t_vec	p_to_l;
+	double	ret;
+	t_vec	inter_to_l;
 	double	n_dot_l;
+	t_vec	l_reflect;
+	double	reflect_dot_view;
 
-	lighting = info.a.intensity;
-	//check_shadow
-	p_to_l = vec_sub(info.l.coord, p);
-	n_dot_l = vec_dot(n, p_to_l);
+	ret = info.a.intensity;
+	inter_to_l = vec_sub(info.l.coord, inter);
+	// shadow part should be added here
+	// ...
+	// diffuse
+	n_dot_l = vec_dot(n, inter_to_l);
 	if (n_dot_l > 0)
-		lighting += info.l.intensity * n_dot_l / (vec_len(n) * vec_len(p_to_l));
-    return (lighting);
+		ret += info.l.intensity * n_dot_l / (vec_len(n) * vec_len(inter_to_l));
+	// specular. specular exponent value tests should be done.
+	l_reflect = vec_sub(vec_scale(n, n_dot_l + n_dot_l), view);
+	reflect_dot_view = vec_dot(l_reflect, view);
+	if (reflect_dot_view > 0)
+		ret += info.l.intensity * pow(
+			reflect_dot_view / (vec_len(l_reflect) * vec_len(view)), S_EXP);
+    return (ret);
 }
 
 int	open_file(char *path)
