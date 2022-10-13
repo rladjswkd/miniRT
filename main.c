@@ -20,7 +20,7 @@
 #define P_HEI 720
 
 //#define	INFINITY	1e500
-#define	S_EXP		100 // specular exponent
+#define	S_EXP		10 // specular exponent
 
 typedef struct s_img
 {
@@ -847,45 +847,66 @@ int	intersect(t_ray ray, t_world world, t_obj *obj)
 	check_pl(ray, world.pl, obj, obj->t);
     return (obj->type);
 }
-// view is -camera_ray(same size)
-double	compute_lighting(t_vec inter, t_vec n, t_vec v, t_world world) // only for diffuse reflection, p_norm should be an unit vector
+
+t_vec	rgb_to_vec(t_rgb rgb)
 {
-	double	ret;
+	return ((t_vec){rgb.r / 255.0, rgb.g / 255.0, rgb.b / 255.0});
+}
+
+t_rgb	mult_rgb_vec(t_rgb rgb, t_vec vec)
+{
+	return ((t_rgb){(int)(vec.x * rgb.r),
+		(int)(vec.y * rgb.g), (int)(vec.z * rgb.b)});
+}
+
+t_vec	compute_diffuse(t_vec inter, t_vec n, t_world world)
+{
+	t_vec	ret;
 	t_vec	l;
 	double	n_dot_l;
+
+	ret = (t_vec){0, 0, 0};
+	l = vec_normalize(vec_sub(world.l.coord, inter));
+	n_dot_l = vec_dot(n, l);
+	if (n_dot_l > 0)
+		ret = vec_scale(rgb_to_vec(world.l.rgb), world.l.intensity * n_dot_l);
+	return (ret);
+}
+
+t_vec	compute_specular(t_vec inter, t_vec n, t_vec v, t_world world)
+{
+	t_vec	ret;
+	t_vec	l;
 	t_vec	r;
 	double	r_dot_v;
 
-	ret = world.a.intensity;
+	ret = (t_vec){0, 0, 0};
 	l = vec_normalize(vec_sub(world.l.coord, inter));
-	// shadow part should be added here
-	// ...
-	// diffuse
-	n_dot_l = vec_dot(n, l);
-	if (n_dot_l > 0)
-		ret += world.l.intensity * n_dot_l;
-	// specular. specular exponent value tests should be done.
 	r = vec_sub(vec_neg(l), vec_scale(n, 2.0 * vec_dot(n, vec_neg(l))));
 	r_dot_v = vec_dot(v, r);
 	if (r_dot_v > 0)
-		ret += world.l.intensity * pow(r_dot_v, S_EXP);
+		ret = vec_scale(rgb_to_vec(world.l.rgb),
+			world.l.intensity * pow(r_dot_v, S_EXP));
     return (ret);
 }
 
-double	compute_specular(t_vec inter, t_vec n, t_vec v, t_world world)
+t_vec	compute_lighting(t_vec inter, t_vec n, t_vec v, t_world world) // only for diffuse reflection, p_norm should be an unit vector
 {
-	double	ret;
-	t_vec	l;
-	t_vec	r;
-	double	r_dot_v;
-
-	ret = 0;
-	l = vec_normalize(vec_sub(world.l.coord, inter));
-	r = vec_sub(vec_neg(l), vec_scale(n, 2.0 * vec_dot(n, vec_neg(l))));
-	r_dot_v = vec_dot(v, r);
-	if (r_dot_v > 0)
-		ret += world.l.intensity * pow(r_dot_v, S_EXP);
-    return (ret);
+	t_vec	v_ambient;
+	t_vec	v_diffuse;
+	t_vec	v_specular;
+	t_vec	lighting;
+	
+	v_ambient = vec_scale(rgb_to_vec(world.l.rgb), world.a.intensity);
+	// shadow part should be added here
+	// ...
+	v_diffuse = compute_diffuse(inter, n , world);
+	v_specular = compute_specular(inter, n, v, world);
+	lighting = vec_add(vec_add(v_ambient, v_diffuse), v_specular);
+	lighting.x -= (lighting.x > 1.0) * (lighting.x - 1.0);
+	lighting.y -= (lighting.y > 1.0) * (lighting.y - 1.0);
+	lighting.z -= (lighting.z > 1.0) * (lighting.z - 1.0);
+	return (lighting);
 }
 
 int	open_file(char *path)
@@ -1058,7 +1079,7 @@ t_ray	generate_ray(t_coord pos, t_p_info p_info, int i, int j)
 	return (ret);
 }
 
-t_rgb	get_obj_rgb(t_obj obj, double intensity)
+t_rgb	get_obj_rgb(t_obj obj, t_vec lighting)
 {
 	t_rgb	ret;
 
@@ -1068,20 +1089,17 @@ t_rgb	get_obj_rgb(t_obj obj, double intensity)
 		ret = ((t_cy *)obj.object)->rgb;
 	else
 		ret = ((t_pl *)obj.object)->rgb;
-	ret.r = ret.r * intensity;
-	ret.g = ret.g * intensity;
-	ret.b = ret.b * intensity;
-	return (ret);
+	return (mult_rgb_vec(ret, lighting));
 }
 
-void	dot_pixel(t_img *img, t_rgb color, int i, double specular)
+void	dot_pixel(t_img *img, t_rgb color, int i)
 {
 	int		pixel;
 
 	pixel = i * 4;
-	img->addr[pixel] = color.b + (int)(255 * specular) > 255 ? (char)255 : color.b + (int)(255 * specular);
-	img->addr[pixel + 1] = color.g + (int)(255 * specular) > 255 ? (char)255 : color.g + (int)(255 * specular);
-	img->addr[pixel + 2] = color.r + (int)(255 * specular) > 255 ? (char)255 : color.r + (int)(255 * specular);
+	img->addr[pixel] = color.b;
+	img->addr[pixel + 1] = color.g;
+	img->addr[pixel + 2] = color.r;
 }
 
 t_vec	get_tangent_norm_cy(t_cy *cy, t_coord p)
@@ -1133,8 +1151,9 @@ int	trace_ray(t_img *img, t_world *world, t_ray ray, int i)
 	// 	//default
 	// 	return (0);
 	// }
-	color = get_obj_rgb(obj, compute_lighting(p, n, vec_normalize(vec_neg(ray.dir)), *world));
-	dot_pixel(img, color, i, compute_specular(p, n, vec_normalize(vec_neg(ray.dir)), *world));
+	color = get_obj_rgb(obj,
+		compute_lighting(p, n, vec_neg(vec_normalize(ray.dir)), *world));
+	dot_pixel(img, color, i);
 	return (0);
 }
 /////////////////////////////////////////////////////
