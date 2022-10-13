@@ -16,11 +16,11 @@
 #define UP				126
 #define RIGHT			124
 #define DOWN			125
-#define P_WID 999
-#define P_HEI 999
+#define P_WID 1280
+#define P_HEI 720
 
 //#define	INFINITY	1e500
-#define	S_EXP		100 // specular exponent
+#define	S_EXP		10 // specular exponent
 
 typedef struct s_img
 {
@@ -104,7 +104,7 @@ typedef struct s_node
 	struct s_node	*next;
 }	t_node;
 
-typedef struct s_rt_info
+typedef struct s_world
 {
 	t_ambient	a;
 	t_camera	c;
@@ -112,7 +112,7 @@ typedef struct s_rt_info
 	t_node		*sp;
 	t_node		*cy;
 	t_node		*pl;
-}	t_rt_info;
+}	t_world;
 
 typedef struct s_object
 {
@@ -235,14 +235,14 @@ int	set_coordinate(char *coord_str, t_coord *coord)
 	return (free_splitted(coord_info, 1));
 }
 
-int	set_ambient(char **info, int cnt, t_rt_info *rt_info)
+int	set_ambient(char **info, int cnt, t_world *world)
 {
 	double		intensity;
 	t_ambient	*a;
 
 	if (cnt != 3)
 		return (0);
-	a = &(rt_info->a);
+	a = &(world->a);
 	if (!get_double(info[1], &intensity) || intensity < 0 || 1 < intensity)
 		return (0);
 	if (!set_rgb(info[2], &(a->rgb)))
@@ -251,14 +251,14 @@ int	set_ambient(char **info, int cnt, t_rt_info *rt_info)
 	return (1);
 }
 
-int	set_light(char **info, int cnt, t_rt_info *rt_info)
+int	set_light(char **info, int cnt, t_world *world)
 {
 	double	intensitiy;
 	t_light	*l;
 
 	if (cnt != 4)
 		return (0);
-	l = &(rt_info->l);
+	l = &(world->l);
 	if (!set_coordinate(info[1], &(l->coord)))
 		return (0);
 	if (!get_double(info[2], &intensitiy) || intensitiy < 0 || 1 < intensitiy)
@@ -269,14 +269,14 @@ int	set_light(char **info, int cnt, t_rt_info *rt_info)
 	return (1);
 }
 
-int	set_camera(char **info, int cnt, t_rt_info *rt_info)
+int	set_camera(char **info, int cnt, t_world *world)
 {
 	int			fov;
 	t_camera	*c;
 
 	if (cnt != 4)
 		return (0);
-	c = &(rt_info->c);
+	c = &(world->c);
 	if (!set_coordinate(info[1], &(c->coord)))
 		return (0);
 	if (!set_coordinate(info[2], &(c->norm))
@@ -295,13 +295,13 @@ t_node	*get_last_node(t_node *list) // this function is called after malloc, so 
 	return (list);
 }
 
-int	set_plane(char **info, int cnt, t_rt_info *rt_info)
+int	set_plane(char **info, int cnt, t_world *world)
 {
 	t_pl	*pl;
 
 	if (cnt != 4)
 		return (0);
-	pl = (t_pl *)(get_last_node(rt_info->pl)->data);
+	pl = (t_pl *)(get_last_node(world->pl)->data);
 	if (!set_coordinate(info[1], &(pl->coord)))
 		return (0);
 	if (!set_coordinate(info[2], &(pl->norm))
@@ -312,14 +312,14 @@ int	set_plane(char **info, int cnt, t_rt_info *rt_info)
 	return (1);
 }
 
-int	set_sphere(char **info, int cnt, t_rt_info *rt_info)
+int	set_sphere(char **info, int cnt, t_world *world)
 {
 	double	diameter;
 	t_sp	*sp;
 
 	if (cnt != 4)
 		return (0);
-	sp = (t_sp *)(get_last_node(rt_info->sp)->data);
+	sp = (t_sp *)(get_last_node(world->sp)->data);
 	if (!set_coordinate(info[1], &(sp->coord)))
 		return (0);
 	if (!get_double(info[2], &diameter) || diameter < 0)
@@ -330,7 +330,7 @@ int	set_sphere(char **info, int cnt, t_rt_info *rt_info)
 	return (1);
 }
 
-int	set_cylinder(char **info, int cnt, t_rt_info *rt_info)
+int	set_cylinder(char **info, int cnt, t_world *world)
 {
 	double	diameter;
 	double	height;
@@ -338,7 +338,7 @@ int	set_cylinder(char **info, int cnt, t_rt_info *rt_info)
 
 	if (cnt != 6)
 		return (0);
-	cy = (t_cy *)(get_last_node(rt_info->cy)->data);
+	cy = (t_cy *)(get_last_node(world->cy)->data);
 	if (!set_coordinate(info[1], &(cy->coord)))
 		return (0);
 	if (!set_coordinate(info[2], &(cy->norm))
@@ -427,7 +427,7 @@ void	clear_list(t_node **lst) // will be used in error handling function right b
 	*lst = 0;
 }
 
-int	set_object_list(t_rt_info *rt, int index)
+int	set_object_list(t_world *rt, int index)
 {
 	t_node	**objects;
 	t_node	*new_node;
@@ -448,12 +448,12 @@ splitted
 	1. 널 포인터 및 빈 문자열일 때 : 가드가 거름.
 	2. 내용은 있지만, 유효하지 않은 상태일 때 : 각 set_* 함수들이 걸러야 함.
 */
-int	set_rt_info(char *line, t_rt_info *rt, int *mask)
+int	set_world(char *line, t_world *rt, int *mask)
 {
 	char		**splitted;
 	int			cnt;
 	int			index;
-	static int	(*fp[6])(char **, int, t_rt_info *) = {set_ambient, set_camera,
+	static int	(*fp[6])(char **, int, t_world *) = {set_ambient, set_camera,
 		set_light, set_sphere, set_plane, set_cylinder};
 	
 	splitted = split_line(line, ' ', &cnt); // all split_lines need null-guard.
@@ -461,7 +461,7 @@ int	set_rt_info(char *line, t_rt_info *rt, int *mask)
 		return (free_splitted(splitted, 0));
 	index = check_identifier(splitted[0]);
 	if (index == -1)
-		return (free_splitted(splitted, 0)); // caller must print error if set_rt_info returns 0.
+		return (free_splitted(splitted, 0)); // caller must print error if set_world returns 0.
 	if (index < 3 && (*mask & 1 << index || !(*fp[index])(splitted, cnt, rt))) // A, C, L shouldn't be on mutiple lines and don't need malloc.
 		return (free_splitted(splitted, 0));
 	*mask |= 1 << index;
@@ -520,6 +520,10 @@ t_vec	vec_proj(t_vec v1, t_vec v2)
 	return ((t_vec){n.x * scalar, n.y * scalar, n.z * scalar});
 }
 
+t_vec	vec_neg(t_vec vec)
+{
+	return ((t_vec){-vec.x, -vec.y, -vec.z});
+}
 // int	get_min_intersection(double *ret, t_inter i)
 // {
 // 	if (i.l <= 1 && i.r <= 1)
@@ -628,6 +632,7 @@ void	cal_cy_caps(t_ray ray, t_cy cy, t_inter *inter)
 	inter->l = vec_dot(cy.norm, vec_sub(ray.pos, bottom_center)) / n_dot_dir;
 	inter->r = vec_dot(cy.norm, vec_sub(ray.pos, top_center)) / n_dot_dir;
 }
+
 int	is_valid_t1(t_cy cy, t_ray ray, double t)
 {
 	return (t >= 0 && vec_dot(cy.norm, vec_sub(
@@ -833,39 +838,75 @@ void	check_pl(t_ray ray, t_node *pl, t_obj *obj, double initial)
 	obj->t = t;
 }
 
-int	intersect(t_ray ray, t_rt_info info, t_obj *obj)
+int	intersect(t_ray ray, t_world world, t_obj *obj)
 {
 	obj->type = 0;
 	obj->t = INFINITY;
-	check_sp(ray, info.sp, obj, obj->t);
-	check_cy(ray, info.cy, obj, obj->t);
-	check_pl(ray, info.pl, obj, obj->t);
+	check_sp(ray, world.sp, obj, obj->t);
+	check_cy(ray, world.cy, obj, obj->t);
+	check_pl(ray, world.pl, obj, obj->t);
     return (obj->type);
 }
-// view is -camera_ray(same size)
-double	compute_lighting(t_vec inter, t_vec n, t_vec view, t_rt_info info) // only for diffuse reflection, p_norm should be an unit vector
-{
-	double	ret;
-	t_vec	inter_to_l;
-	double	n_dot_l;
-	t_vec	l_reflect;
-	double	reflect_dot_view;
 
-	ret = info.a.intensity;
-	inter_to_l = vec_sub(info.l.coord, inter);
+t_vec	rgb_to_vec(t_rgb rgb)
+{
+	return ((t_vec){rgb.r / 255.0, rgb.g / 255.0, rgb.b / 255.0});
+}
+
+t_rgb	mult_rgb_vec(t_rgb rgb, t_vec vec)
+{
+	return ((t_rgb){(int)(vec.x * rgb.r),
+		(int)(vec.y * rgb.g), (int)(vec.z * rgb.b)});
+}
+
+t_vec	compute_diffuse(t_vec inter, t_vec n, t_world world)
+{
+	t_vec	ret;
+	t_vec	l;
+	double	n_dot_l;
+
+	ret = (t_vec){0, 0, 0};
+	l = vec_normalize(vec_sub(world.l.coord, inter));
+	n_dot_l = vec_dot(n, l);
+	if (n_dot_l > 0)
+		ret = vec_scale(rgb_to_vec(world.l.rgb), world.l.intensity * n_dot_l);
+	return (ret);
+}
+
+t_vec	compute_specular(t_vec inter, t_vec n, t_vec v, t_world world)
+{
+	t_vec	ret;
+	t_vec	l;
+	t_vec	r;
+	double	r_dot_v;
+
+	ret = (t_vec){0, 0, 0};
+	l = vec_normalize(vec_sub(world.l.coord, inter));
+	r = vec_sub(vec_neg(l), vec_scale(n, 2.0 * vec_dot(n, vec_neg(l))));
+	r_dot_v = vec_dot(v, r);
+	if (r_dot_v > 0)
+		ret = vec_scale(rgb_to_vec(world.l.rgb),
+			world.l.intensity * pow(r_dot_v, S_EXP));
+    return (ret);
+}
+
+t_vec	compute_lighting(t_vec inter, t_vec n, t_vec v, t_world world) // only for diffuse reflection, p_norm should be an unit vector
+{
+	t_vec	v_ambient;
+	t_vec	v_diffuse;
+	t_vec	v_specular;
+	t_vec	lighting;
+	
+	v_ambient = vec_scale(rgb_to_vec(world.l.rgb), world.a.intensity);
 	// shadow part should be added here
 	// ...
-	// diffuse
-	n_dot_l = vec_dot(n, inter_to_l);
-	if (n_dot_l > 0)
-		ret += info.l.intensity * n_dot_l / (vec_len(n) * vec_len(inter_to_l));
-	// specular. specular exponent value tests should be done.
-	l_reflect = vec_sub(vec_scale(n, n_dot_l + n_dot_l), view);
-	reflect_dot_view = vec_dot(l_reflect, view);
-	if (reflect_dot_view > 0)
-		ret += info.l.intensity * pow(
-			reflect_dot_view / (vec_len(l_reflect) * vec_len(view)), S_EXP);
-    return (ret);
+	v_diffuse = compute_diffuse(inter, n , world);
+	v_specular = compute_specular(inter, n, v, world);
+	lighting = vec_add(vec_add(v_ambient, v_diffuse), v_specular);
+	lighting.x -= (lighting.x > 1.0) * (lighting.x - 1.0);
+	lighting.y -= (lighting.y > 1.0) * (lighting.y - 1.0);
+	lighting.z -= (lighting.z > 1.0) * (lighting.z - 1.0);
+	return (lighting);
 }
 
 int	open_file(char *path)
@@ -881,7 +922,7 @@ int	open_file(char *path)
 	return (fd);
 }
 
-int	read_file(int fd, t_rt_info *rt_info)
+int	read_file(int fd, t_world *world)
 {
 	char		*line;
 	int			flag;
@@ -894,7 +935,8 @@ int	read_file(int fd, t_rt_info *rt_info)
 		if (line == 0)
 			break ;
 		if (line[0] != '\0')
-			flag = set_rt_info(line, rt_info, &mask);
+			flag = set_world
+		(line, world, &mask);
 		free(line);
 	}
 	if (!flag || !(mask & 1 << 0 && mask & 1 << 1 && mask & 1 << 2))
@@ -962,13 +1004,13 @@ t_ray	get_l_ray(t_light l, t_ray ray, t_obj	obj)
 	return (l_ray);
 }
 
-int	check_shadow(t_rt_info info, t_ray l_ray)
+int	check_shadow(t_world world, t_ray l_ray)
 {
-	if (check_shadow_sp(l_ray, info.sp))
+	if (check_shadow_sp(l_ray, world.sp))
 		return (1);
-	if (check_shadow_cy(l_ray, info.cy))
+	if (check_shadow_cy(l_ray, world.cy))
 		return (1);
-	if (check_shadow_pl(l_ray, info.pl))
+	if (check_shadow_pl(l_ray, world.pl))
 		return (1);
 	return (0);
 }
@@ -1037,7 +1079,7 @@ t_ray	generate_ray(t_coord pos, t_p_info p_info, int i, int j)
 	return (ret);
 }
 
-t_rgb	get_obj_rgb(t_obj obj, double intensity)
+t_rgb	get_obj_rgb(t_obj obj, t_vec lighting)
 {
 	t_rgb	ret;
 
@@ -1047,20 +1089,17 @@ t_rgb	get_obj_rgb(t_obj obj, double intensity)
 		ret = ((t_cy *)obj.object)->rgb;
 	else
 		ret = ((t_pl *)obj.object)->rgb;
-	ret.r = ret.r * intensity;
-	ret.g = ret.g * intensity;
-	ret.b = ret.b * intensity;
-	return (ret);
+	return (mult_rgb_vec(ret, lighting));
 }
 
 void	dot_pixel(t_img *img, t_rgb color, int i)
 {
-	int	pixel;
+	int		pixel;
 
 	pixel = i * 4;
-	img->addr[pixel] = color.r;
+	img->addr[pixel] = color.b;
 	img->addr[pixel + 1] = color.g;
-	img->addr[pixel + 2] = color.b;
+	img->addr[pixel + 2] = color.r;
 }
 
 t_vec	get_tangent_norm_cy(t_cy *cy, t_coord p)
@@ -1071,10 +1110,10 @@ t_vec	get_tangent_norm_cy(t_cy *cy, t_coord p)
 
 	a = vec_dot(p, cy->norm);
 	b = vec_dot(vec_add(cy->coord, vec_scale(cy->norm, cy->height)), cy->norm);
-	if (fabs(a - b) == 0.001)
+	if (fabs(a - b) < 1e-6)
 		return (cy->norm);
 	b = vec_dot(cy->coord, cy->norm);
-	if (fabs(a - b) == 0.001)
+	if (fabs(a - b) < 1e-6)
 		return (vec_scale(cy->norm, -1));
 	t_c = vec_add(cy->coord, vec_scale(cy->norm, fabs(a - b)));
 	return (vec_normalize(vec_sub(p, t_c)));
@@ -1085,7 +1124,7 @@ t_vec	get_tangent_norm(t_obj	obj, t_coord p)
 	t_vec	n;
 
 	if (obj.type == SPHERE)
-		n = vec_sub(p, ((t_sp *)obj.object)->coord);
+		n = vec_normalize(vec_sub(p, ((t_sp *)obj.object)->coord));
 	else if (obj.type == CYLINDER)
 		n = get_tangent_norm_cy(obj.object, p);
 	else
@@ -1093,7 +1132,7 @@ t_vec	get_tangent_norm(t_obj	obj, t_coord p)
 	return (n);
 }
 
-int	trace_ray(t_img *img, t_rt_info *rt_info, t_ray ray, int i)
+int	trace_ray(t_img *img, t_world *world, t_ray ray, int i)
 {
 	t_obj	obj;
 	t_ray	l_ray;
@@ -1101,39 +1140,40 @@ int	trace_ray(t_img *img, t_rt_info *rt_info, t_ray ray, int i)
 	t_coord	p;
 	t_vec	n;
 
-	if (!intersect(ray, *rt_info, &obj))
+	if (!intersect(ray, *world, &obj))
 		return (0);
 	//background color
 	p = vec_add(ray.pos, vec_scale(ray.dir, obj.t));
 	n = get_tangent_norm(obj, p);
-	// l_ray = get_l_ray(rt_info->l, ray, obj);
-	// if (check_shadow(*rt_info, l_ray))
+	// l_ray = get_l_ray(world->l, ray, obj);
+	// if (check_shadow(*world, l_ray))
 	// {
 	// 	//default
 	// 	return (0);
 	// }
-	color = get_obj_rgb(obj, compute_lighting(p, n, *rt_info));
+	color = get_obj_rgb(obj,
+		compute_lighting(p, n, vec_neg(vec_normalize(ray.dir)), *world));
 	dot_pixel(img, color, i);
 	return (0);
 }
 /////////////////////////////////////////////////////
 
-int draw_img(t_rt_info *rt_info, t_vars *vars)
+int draw_img(t_world *world, t_vars *vars)
 {
 	t_p_info	p_info;
 	t_ray		ray;
 	int			i;
 	int			j;
 
-	get_pixel_info(rt_info->c, &p_info);
-	i = -1;
-	while (++i < P_HEI)
+	get_pixel_info(world->c, &p_info);
+	j = -1;
+	while (++j < P_HEI)
 	{
-		j = -1;
-		while (++j < P_WID)
+		i = -1;
+		while (++i < P_WID)
 		{
-			ray = generate_ray(rt_info->c.coord, p_info, i, j);
-			trace_ray(&vars->img, rt_info, ray, i * P_HEI + j);
+			ray = generate_ray(world->c.coord, p_info, i, j);
+			trace_ray(&vars->img, world, ray, j * P_WID + i);
 		}
 	}
 	mlx_put_image_to_window(vars->mlx, vars->win, vars->img.ptr, 0, 0);
@@ -1143,7 +1183,7 @@ int draw_img(t_rt_info *rt_info, t_vars *vars)
 int	main(int argc, char **argv)
 {
 	int			fd;
-	t_rt_info	rt_info;
+	t_world		world;
 	t_vars		vars;
 
 	if (argc != 2)
@@ -1152,18 +1192,18 @@ int	main(int argc, char **argv)
 	fd = open_file(argv[1]);
 	if (fd < 0) // remove this when error handling function is completed.
 		return (0); // 에러 문자열 출력하고 처리해주기
-	rt_info.sp = 0;
-	rt_info.pl = 0;
-	rt_info.cy = 0;
-	if (read_file(fd, &rt_info))
+	world.sp = 0;
+	world.pl = 0;
+	world.cy = 0;
+	if (read_file(fd, &world))
 		printf("%s\n", "valid format");
 	else
 		printf("%s\n", "invalid format");
 	/* draw image */
-	draw_img(&rt_info, &vars);
-	clear_list(&(rt_info.sp));
-	clear_list(&(rt_info.pl));
-	clear_list(&(rt_info.cy));
+	draw_img(&world, &vars);
+	clear_list(&(world.sp));
+	clear_list(&(world.pl));
+	clear_list(&(world.cy));
 	mlx_loop(vars.mlx);
 	return (0);
 }
