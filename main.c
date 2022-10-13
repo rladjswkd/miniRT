@@ -349,6 +349,7 @@ int	set_cylinder(char **info, int cnt, t_world *world)
 	if (!get_double(info[4], &height) || height < 0)
 		return (0);
 	if (!set_rgb(info[5], &(cy->rgb)))
+		return (0);
 	cy->diameter = diameter;
 	cy->height = height;
 	return (1);
@@ -629,15 +630,11 @@ void	cal_cy_caps(t_ray ray, t_cy cy, t_inter *inter)
 	inter->r = vec_dot(cy.norm, vec_sub(top_center, ray.pos)) / n_dot_dir;
 }
 
-int	is_valid_t1(t_cy cy, t_ray ray, double t)
+int	is_valid_t1t2(t_cy cy, t_ray ray, double t)
 {
 	return (t > 1 && vec_dot(cy.norm, vec_sub(
-		vec_add(ray.pos, vec_scale(ray.dir, t)), cy.coord)) > 0);
-}
-
-int	is_valid_t2(t_cy cy, t_ray ray, double t)
-{
-	return (t > 1 && vec_dot(cy.norm, vec_sub( 
+		vec_add(ray.pos, vec_scale(ray.dir, t)), cy.coord)) > 0
+		&& vec_dot(cy.norm, vec_sub( 
 		vec_add(ray.pos, vec_scale(ray.dir, t)),
 		vec_add(cy.coord, vec_scale(cy.norm, cy.height)))) < 0);
 }
@@ -671,94 +668,13 @@ int	intersect_cylinder(t_ray ray, t_cy cy, double *t)// rename this to get_cylin
 
 	cal_cy_body(ray, cy, &t_1_2);
 	cal_cy_caps(ray, cy, &t_3_4);
-	ret = choose_smaller_t(HUGE_VAL, t_1_2.l, is_valid_t1(cy, ray, t_1_2.l));
-	ret = choose_smaller_t(ret, t_1_2.r, is_valid_t2(cy, ray, t_1_2.r));
+	ret = choose_smaller_t(HUGE_VAL, t_1_2.l, is_valid_t1t2(cy, ray, t_1_2.l));
+	ret = choose_smaller_t(ret, t_1_2.r, is_valid_t1t2(cy, ray, t_1_2.r));
 	ret = choose_smaller_t(ret, t_3_4.l, is_valid_t3(cy, ray, t_3_4.l));
 	ret = choose_smaller_t(ret, t_3_4.r, is_valid_t4(cy, ray, t_3_4.r));
 	*t = ret;
 	return (ret != HUGE_VAL);
 }
-
-// t_vec	ray_pos(t_ray ray, double t)
-// {
-// 	return (vec_add(ray.pos, vec_scale(ray.dir, t)));
-// }
-
-// int	intersect_cylinder(t_ray ray, t_cy cy, double *t) // ray랑 normal이랑 평행한 지 확인해야 한다., get_min_intersection을 체크하는 함수 포인터를 전달한다.
-// {
-// 	t_inter	inter1;
-// 	t_inter	inter2;
-// 	double	l;
-// 	double	r;
-
-// 	if (fabs(vec_len(vec_proj(vec_normalize(ray.dir), cy.norm)) - 1) < 1e-6)
-// 	{
-// 		if (!intersect_caps(ray, cy, &inter2)
-// 			|| !get_min_intersection(&r, inter2))
-// 			return (0);
-// 		*t = r;
-// 		return (1);
-// 	}
-// 	if (!intersect_body(ray, cy, &inter1))
-// 		return (0);
-// 	get_min_intersection(&l, inter1);
-// 	inter2.l = 0;
-// 	inter2.r = 0;
-// 	intersect_caps(ray, cy, &inter2);
-// 	get_min_intersection(&r, inter2);
-// 	if (!get_min_intersection(&t, (t_inter){l, r}))
-// 		return (0);
-// 	return (1);		
-// }
-// // unit vector check
-// // cylinder is infinite.
-// int	intersect_body(t_ray ray, t_cy cy, t_inter *inter)
-// {
-// 	t_vec		c_perp;
-// 	t_ray		r_perp;
-// 	double		proj_t1;
-// 	double		proj_t2;
-
-// 	c_perp = vec_sub(cy.coord, vec_proj(cy.coord, cy.norm));
-// 	r_perp.pos = vec_sub(ray.pos, vec_proj(ray.pos, cy.norm));
-// 	r_perp.dir = vec_sub(ray.dir, vec_proj(ray.dir, cy.norm));
-// 	if (!intersect_circle(r_perp, (t_circle){c_perp, cy.diameter / 2}, inter))
-// 		return (0);
-// 	proj_t1 = vec_len(vec_proj(vec_sub(ray_pos(ray, inter->l), cy.coord), cy.norm));
-// 	proj_t2 = vec_len(vec_proj(vec_sub(ray_pos(ray, inter->r), cy.coord), cy.norm));
-// 	if (proj_t1 < 0 || cy.height < proj_t1)
-// 		inter->l = -1;
-// 	if (proj_t2 < 0 || cy.height < proj_t2)
-// 		inter->r = -1;
-// 	return (1);
-// }
-
-// int	intersect_caps(t_ray ray, t_cy cy, t_inter *inter)
-// {
-// 	double	bottom;
-// 	double	top;
-// 	double	c_to_t1;
-// 	double	c_to_t2;
-// 	double	radius;
-
-// 	bottom = vec_len(vec_proj(cy.coord, cy.norm));
-// 	top = bottom + cy.height;
-// 	inter->l = (bottom - vec_len(vec_proj(ray.pos, cy.norm)))
-// 		/ vec_len(vec_proj(ray.dir, cy.norm));
-// 	inter->r = (top - vec_len(vec_proj(ray.pos, cy.norm)))
-// 		/ vec_len(vec_proj(ray.dir, cy.norm));
-// 	c_to_t1 = vec_len(vec_sub(ray_pos(ray, inter->l), cy.coord));
-// 	c_to_t2 = vec_len(vec_sub(ray_pos(ray, inter->r), vec_add(
-// 			cy.coord, vec_scale(cy.norm, cy.height))));
-// 	radius = cy.diameter / 2;
-// 	if (c_to_t1 >= radius && c_to_t2 >= radius)
-// 		return (0);
-// 	if (c_to_t1 >= radius)
-// 		inter->l = -1;
-// 	if (c_to_t2 >= radius)
-// 		inter->r = -1;
-// 	return (1);
-// }
 
 int	intersect_plane(t_ray ray, t_pl pl, double *t) //rename this to get_plane_t
 {
@@ -861,11 +777,11 @@ double	compute_lighting(t_vec inter, t_vec n, t_vec view, t_world world) // only
 	if (n_dot_l > 0)
 		ret += world.l.intensity * n_dot_l / (vec_len(n) * vec_len(inter_to_l));
 	// specular. specular exponent value tests should be done.
-	l_reflect = vec_sub(vec_scale(n, n_dot_l + n_dot_l), view);
-	reflect_dot_view = vec_dot(l_reflect, view);
-	if (reflect_dot_view > 0)
-		ret += world.l.intensity * pow(
-			reflect_dot_view / (vec_len(l_reflect) * vec_len(view)), S_EXP);
+	// l_reflect = vec_sub(vec_scale(n, n_dot_l + n_dot_l), view);
+	// reflect_dot_view = vec_dot(l_reflect, view);
+	// if (reflect_dot_view > 0)
+	// 	ret += world.l.intensity * pow(
+	// 		reflect_dot_view / (vec_len(l_reflect) * vec_len(view)), S_EXP);
     return (ret);
 }
 
@@ -895,8 +811,7 @@ int	read_file(int fd, t_world *world)
 		if (line == 0)
 			break ;
 		if (line[0] != '\0')
-			flag = set_world
-		(line, world, &mask);
+			flag = set_world(line, world, &mask);
 		free(line);
 	}
 	if (!flag || !(mask & 1 << 0 && mask & 1 << 1 && mask & 1 << 2))
