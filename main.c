@@ -20,7 +20,7 @@
 #define P_HEI 720
 
 //#define	INFINITY	1e500
-#define	S_EXP		100 // specular exponent
+#define	S_EXP		10 // specular exponent
 
 typedef struct s_img
 {
@@ -521,6 +521,10 @@ t_vec	vec_proj(t_vec v1, t_vec v2)
 	return ((t_vec){n.x * scalar, n.y * scalar, n.z * scalar});
 }
 
+t_vec	vec_neg(t_vec vec)
+{
+	return ((t_vec){-vec.x, -vec.y, -vec.z});
+}
 // int	get_min_intersection(double *ret, t_inter i)
 // {
 // 	if (i.l <= 1 && i.r <= 1)
@@ -754,35 +758,72 @@ int	intersect(t_ray ray, t_world world, t_obj *obj)
 {
 	obj->type = 0;
 	obj->t = INFINITY;
+
 	check_sp(ray, world.sp, obj);
 	check_cy(ray, world.cy, obj);
 	check_pl(ray, world.pl, obj);
     return (obj->type);
 }
 
-double	compute_lighting(t_vec inter, t_vec n, t_vec view, t_world world) // only for diffuse reflection, p_norm should be an unit vector
+t_vec	rgb_to_vec(t_rgb rgb)
 {
-	double	ret;
-	t_vec	inter_to_l;
-	double	n_dot_l;
-	t_vec	l_reflect;
-	double	reflect_dot_view;
+	return ((t_vec){rgb.r / 255.0, rgb.g / 255.0, rgb.b / 255.0});
+}
 
-	ret = world.a.intensity;
-	inter_to_l = vec_sub(world.l.coord, inter);
+t_rgb	mult_rgb_vec(t_rgb rgb, t_vec vec)
+{
+	return ((t_rgb){(int)(vec.x * rgb.r),
+		(int)(vec.y * rgb.g), (int)(vec.z * rgb.b)});
+}
+
+t_vec	compute_diffuse(t_vec inter, t_vec n, t_world world)
+{
+	t_vec	ret;
+	t_vec	l;
+	double	n_dot_l;
+  
+	ret = (t_vec){0, 0, 0};
+	l = vec_normalize(vec_sub(world.l.coord, inter));
+	n_dot_l = vec_dot(n, l);
+	if (n_dot_l > 0)
+		ret = vec_scale(rgb_to_vec(world.l.rgb), world.l.intensity * n_dot_l);
+	return (ret);
+}
+
+t_vec	compute_specular(t_vec inter, t_vec n, t_vec v, t_world world)
+{
+	t_vec	ret;
+	t_vec	l;
+	t_vec	r;
+	double	r_dot_v;
+
+	ret = (t_vec){0, 0, 0};
+	l = vec_normalize(vec_sub(world.l.coord, inter));
+	r = vec_sub(vec_neg(l), vec_scale(n, 2.0 * vec_dot(n, vec_neg(l))));
+	r_dot_v = vec_dot(v, r);
+	if (r_dot_v > 0)
+		ret = vec_scale(rgb_to_vec(world.l.rgb),
+			world.l.intensity * pow(r_dot_v, S_EXP));
+    return (ret);
+}
+
+t_vec	compute_lighting(t_vec inter, t_vec n, t_vec v, t_world world) // only for diffuse reflection, p_norm should be an unit vector
+{
+	t_vec	v_ambient;
+	t_vec	v_diffuse;
+	t_vec	v_specular;
+	t_vec	lighting;
+	
+	v_ambient = vec_scale(rgb_to_vec(world.l.rgb), world.a.intensity);
 	// shadow part should be added here
 	// ...
-	// diffuse
-	n_dot_l = vec_dot(n, inter_to_l);
-	if (n_dot_l > 0)
-		ret += world.l.intensity * n_dot_l / (vec_len(n) * vec_len(inter_to_l));
-	// specular. specular exponent value tests should be done.
-	// l_reflect = vec_sub(vec_scale(n, n_dot_l + n_dot_l), view);
-	// reflect_dot_view = vec_dot(l_reflect, view);
-	// if (reflect_dot_view > 0)
-	// 	ret += world.l.intensity * pow(
-	// 		reflect_dot_view / (vec_len(l_reflect) * vec_len(view)), S_EXP);
-    return (ret);
+	v_diffuse = compute_diffuse(inter, n , world);
+	v_specular = compute_specular(inter, n, v, world);
+	lighting = vec_add(vec_add(v_ambient, v_diffuse), v_specular);
+	lighting.x -= (lighting.x > 1.0) * (lighting.x - 1.0);
+	lighting.y -= (lighting.y > 1.0) * (lighting.y - 1.0);
+	lighting.z -= (lighting.z > 1.0) * (lighting.z - 1.0);
+	return (lighting);
 }
 
 int	open_file(char *path)
@@ -954,7 +995,7 @@ t_ray	generate_ray(t_coord pos, t_p_info p_info, int i, int j)
 	return (ret);
 }
 
-t_rgb	get_obj_rgb(t_obj obj, double intensity)
+t_rgb	get_obj_rgb(t_obj obj, t_vec lighting)
 {
 	t_rgb	ret;
 
@@ -964,10 +1005,7 @@ t_rgb	get_obj_rgb(t_obj obj, double intensity)
 		ret = ((t_cy *)obj.object)->rgb;
 	else
 		ret = ((t_pl *)obj.object)->rgb;
-	ret.r = ret.r * intensity;
-	ret.g = ret.g * intensity;
-	ret.b = ret.b * intensity;
-	return (ret);
+	return (mult_rgb_vec(ret, lighting));
 }
 
 void	dot_pixel(t_img *img, t_rgb color, int i)
@@ -1002,7 +1040,7 @@ t_vec	get_tangent_norm(t_obj	obj, t_coord p)
 	t_vec	n;
 
 	if (obj.type == SPHERE)
-		n = vec_sub(p, ((t_sp *)obj.object)->coord);
+		n = vec_normalize(vec_sub(p, ((t_sp *)obj.object)->coord));
 	else if (obj.type == CYLINDER)
 		n = get_tangent_norm_cy(obj.object, p);
 	else
@@ -1029,7 +1067,8 @@ int	trace_ray(t_img *img, t_world *world, t_ray ray, int i)
 	// 	//default
 	// 	return (0);
 	// }
-	color = get_obj_rgb(obj, compute_lighting(p, n, vec_scale(ray.dir, -1), *world));
+	color = get_obj_rgb(obj,
+		compute_lighting(p, n, vec_neg(vec_normalize(ray.dir)), *world));
 	dot_pixel(img, color, i);
 	return (0);
 }
