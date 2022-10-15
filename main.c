@@ -12,15 +12,15 @@
 #define	CYLINDER	2
 #define	PLANE		3
 #define ESC_KEY		53
-#define LEFT			123
-#define UP				126
-#define RIGHT			124
-#define DOWN			125
-#define P_WID 1280
-#define P_HEI 720
+#define LEFT		123
+#define UP			126
+#define RIGHT		124
+#define DOWN		125
+#define P_WID 		1280
+#define P_HEI		720
 
 //#define	INFINITY	1e500
-#define	S_EXP		10 // specular exponent
+#define	S_EXP		32 // specular exponent
 
 typedef struct s_img
 {
@@ -187,7 +187,7 @@ int	check_normal(t_vec vec)
 	y = vec.y;
 	z = vec.z;
 	return (-1 <= x && x <= 1 && -1 <= y && y <= 1 && -1 <= z && z <= 1
-		&& sqrt(x * x + y * y + z * z) == 1);
+		&& fabs(sqrt(x * x + y * y + z * z) - 1) < 1e-6);
 }
 
 int	free_splitted(char **splitted, int ret)
@@ -525,15 +525,6 @@ t_vec	vec_neg(t_vec vec)
 {
 	return ((t_vec){-vec.x, -vec.y, -vec.z});
 }
-// int	get_min_intersection(double *ret, t_inter i)
-// {
-// 	if (i.l <= 1 && i.r <= 1)
-// 		return (0);
-// 	*ret = i.r;
-// 	if (i.l > 1)
-// 		*ret = i.l;
-// 	return (1);
-// }
 
 double	choose_smaller_t(double current, double candidate, int condition)
 {
@@ -541,36 +532,6 @@ double	choose_smaller_t(double current, double candidate, int condition)
 		return (candidate);
 	return (current);
 }
-
-// int	intersect_circle(t_ray ray, t_circle cir, t_inter *inter) // rename this to cal_sphere_t
-// {
-// 	double		a;
-// 	double		b;
-// 	double		c;
-// 	double		discriminant;
-// 	t_vec		ray_sp;
-
-// 	ray_sp = vec_sub(ray.pos, cir.center);
-// 	a = vec_dot(ray.dir, ray.dir);
-// 	b = 2 * vec_dot(ray_sp, ray.dir);
-// 	c = vec_dot(ray_sp, ray_sp) - pow(cir.radius, 2);
-// 	discriminant = b * b - 4 * a * c;
-// 	if (discriminant < 0)
-// 		return (0);
-// 	inter->l = (-b - sqrt(discriminant)) / (2 * a); // smaller
-// 	inter->r = (-b + sqrt(discriminant)) / (2 * a); // bigger
-// 	return (1);
-// }
-
-// int	intersect_sphere(t_ray ray, t_sp sp, double *t)// rename this to get_sphere_t and remove t_circle things.
-// {
-// 	t_inter		*i;
-// 	t_circle	p;
-
-// 	p.center = sp.coord;
-// 	p.radius = sp.diameter / 2;
-// 	return (intersect_circle(ray, p, i) && get_min_intersection(t, *i));
-// }
 
 void	solve_equation(t_equation eq, t_inter *inter)
 {
@@ -685,7 +646,7 @@ int	intersect_plane(t_ray ray, t_pl pl, double *t) //rename this to get_plane_t
 	double	ray_pl_dot;
 
 	ray_pl_dot = vec_dot(ray.dir, pl.norm);
-	if (ray_pl_dot < 1e-6)
+	if (fabs(ray_pl_dot) <= 1e-6)
 		return (0);
 	*t = vec_dot(vec_sub(pl.coord, ray.pos), pl.norm) / ray_pl_dot;
 	return (*t > 1);
@@ -814,9 +775,7 @@ t_vec	compute_lighting(t_vec inter, t_vec n, t_vec v, t_world world) // only for
 	t_vec	v_specular;
 	t_vec	lighting;
 	
-	v_ambient = vec_scale(rgb_to_vec(world.l.rgb), world.a.intensity);
-	// shadow part should be added here
-	// ...
+	v_ambient = vec_scale(rgb_to_vec(world.l.rgb), world.a.intensity); // ambient light rgb should be applied.
 	v_diffuse = compute_diffuse(inter, n , world);
 	v_specular = compute_specular(inter, n, v, world);
 	lighting = vec_add(vec_add(v_ambient, v_diffuse), v_specular);
@@ -1051,7 +1010,7 @@ t_vec	get_tangent_norm(t_obj	obj, t_coord p)
 int	trace_ray(t_img *img, t_world *world, t_ray ray, int i)
 {
 	t_obj	obj;
-	t_ray	l_ray;
+	// t_ray	l_ray;
 	t_rgb	color;
 	t_coord	p;
 	t_vec	n;
