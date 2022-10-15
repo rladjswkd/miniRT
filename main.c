@@ -11,6 +11,7 @@
 #define SPHERE		1
 #define	CYLINDER	2
 #define	PLANE		3
+#define SHADOW_BIAS 1.00001
 #define ESC_KEY		53
 #define LEFT			123
 #define UP				126
@@ -765,101 +766,6 @@ int	intersect(t_ray ray, t_world world, t_obj *obj)
     return (obj->type);
 }
 
-t_vec	rgb_to_vec(t_rgb rgb)
-{
-	return ((t_vec){rgb.r / 255.0, rgb.g / 255.0, rgb.b / 255.0});
-}
-
-t_rgb	mult_rgb_vec(t_rgb rgb, t_vec vec)
-{
-	return ((t_rgb){(int)(vec.x * rgb.r),
-		(int)(vec.y * rgb.g), (int)(vec.z * rgb.b)});
-}
-
-t_vec	compute_diffuse(t_vec inter, t_vec n, t_world world)
-{
-	t_vec	ret;
-	t_vec	l;
-	double	n_dot_l;
-  
-	ret = (t_vec){0, 0, 0};
-	l = vec_normalize(vec_sub(world.l.coord, inter));
-	n_dot_l = vec_dot(n, l);
-	if (n_dot_l > 0)
-		ret = vec_scale(rgb_to_vec(world.l.rgb), world.l.intensity * n_dot_l);
-	return (ret);
-}
-
-t_vec	compute_specular(t_vec inter, t_vec n, t_vec v, t_world world)
-{
-	t_vec	ret;
-	t_vec	l;
-	t_vec	r;
-	double	r_dot_v;
-
-	ret = (t_vec){0, 0, 0};
-	l = vec_normalize(vec_sub(world.l.coord, inter));
-	r = vec_sub(vec_neg(l), vec_scale(n, 2.0 * vec_dot(n, vec_neg(l))));
-	r_dot_v = vec_dot(v, r);
-	if (r_dot_v > 0)
-		ret = vec_scale(rgb_to_vec(world.l.rgb),
-			world.l.intensity * pow(r_dot_v, S_EXP));
-    return (ret);
-}
-
-t_vec	compute_lighting(t_vec inter, t_vec n, t_vec v, t_world world) // only for diffuse reflection, p_norm should be an unit vector
-{
-	t_vec	v_ambient;
-	t_vec	v_diffuse;
-	t_vec	v_specular;
-	t_vec	lighting;
-	
-	v_ambient = vec_scale(rgb_to_vec(world.l.rgb), world.a.intensity);
-	// shadow part should be added here
-	// ...
-	v_diffuse = compute_diffuse(inter, n , world);
-	v_specular = compute_specular(inter, n, v, world);
-	lighting = vec_add(vec_add(v_ambient, v_diffuse), v_specular);
-	lighting.x -= (lighting.x > 1.0) * (lighting.x - 1.0);
-	lighting.y -= (lighting.y > 1.0) * (lighting.y - 1.0);
-	lighting.z -= (lighting.z > 1.0) * (lighting.z - 1.0);
-	return (lighting);
-}
-
-int	open_file(char *path)
-{
-	int	fd;
-	int	len;
-
-	fd = -1;
-	len = ft_strlen(path);
-	if (path[len - 3] == '.' && path[len - 2] == 'r' && path[len - 1] == 't')
-		fd = open(path, O_RDONLY); // is read-only enough?
-	// call error handling function to exit.
-	return (fd);
-}
-
-int	read_file(int fd, t_world *world)
-{
-	char		*line;
-	int			flag;
-	static int	mask = 0; // bit-mask to check A, C, L should be declared only and at least once.
-
-	flag = 1;
-	while (flag)
-	{
-		line = get_next_line(fd);
-		if (line == 0)
-			break ;
-		if (line[0] != '\0')
-			flag = set_world(line, world, &mask);
-		free(line);
-	}
-	if (!flag || !(mask & 1 << 0 && mask & 1 << 1 && mask & 1 << 2))
-		return (0);
-	return (1);
-}
-
 int	check_shadow_sp(t_ray ray, t_node *sp)
 {
 	double	cur;
@@ -909,14 +815,14 @@ int	check_shadow_pl(t_ray ray, t_node *pl)
 	return (0);
 }
 
-t_ray	get_l_ray(t_light l, t_ray ray, t_obj	obj)
+t_ray	get_l_ray(t_light l, t_vec p)
 {
 	t_ray	l_ray;
 	t_vec	t_pos;
 
-	t_pos = vec_add(vec_scale(ray.dir, obj.t), ray.pos);
-	l_ray.dir = vec_sub(l.coord, t_pos);
-	l_ray.pos = vec_sub(t_pos, l_ray.dir);
+	l_ray.dir = vec_sub(l.coord, p);
+	l_ray.pos = vec_sub(p, l_ray.dir);
+	l_ray.dir = vec_scale(l_ray.dir, SHADOW_BIAS);
 	return (l_ray);
 }
 
@@ -929,6 +835,104 @@ int	check_shadow(t_world world, t_ray l_ray)
 	if (check_shadow_pl(l_ray, world.pl))
 		return (1);
 	return (0);
+}
+
+t_vec	rgb_to_vec(t_rgb rgb)
+{
+	return ((t_vec){rgb.r / 255.0, rgb.g / 255.0, rgb.b / 255.0});
+}
+
+t_rgb	mult_rgb_vec(t_rgb rgb, t_vec vec)
+{
+	return ((t_rgb){(int)(vec.x * rgb.r),
+		(int)(vec.y * rgb.g), (int)(vec.z * rgb.b)});
+}
+
+t_vec	compute_diffuse(t_vec inter, t_vec n, t_world world)
+{
+	t_vec	ret;
+	t_vec	l;
+	double	n_dot_l;
+
+	ret = (t_vec){0, 0, 0};
+	l = vec_normalize(vec_sub(world.l.coord, inter));
+	n_dot_l = vec_dot(n, l);
+	if (n_dot_l > 0)
+		ret = vec_scale(rgb_to_vec(world.l.rgb), world.l.intensity * n_dot_l);
+	return (ret);
+}
+
+t_vec	compute_specular(t_vec inter, t_vec n, t_vec v, t_world world)
+{
+	t_vec	ret;
+	t_vec	l;
+	t_vec	r;
+	double	r_dot_v;
+
+	ret = (t_vec){0, 0, 0};
+	l = vec_normalize(vec_sub(world.l.coord, inter));
+	r = vec_sub(vec_neg(l), vec_scale(n, 2.0 * vec_dot(n, vec_neg(l))));
+	r_dot_v = vec_dot(v, r);
+	if (r_dot_v > 0)
+		ret = vec_scale(rgb_to_vec(world.l.rgb),
+			world.l.intensity * pow(r_dot_v, S_EXP));
+    return (ret);
+}
+
+t_vec	compute_lighting(t_vec inter, t_vec n, t_vec v, t_world world) // only for diffuse reflection, p_norm should be an unit vector
+{
+	t_vec	v_ambient;
+	t_vec	v_diffuse;
+	t_vec	v_specular;
+	t_vec	lighting;
+
+	v_ambient = vec_scale(rgb_to_vec(world.l.rgb), world.a.intensity);
+	if (check_shadow(world, get_l_ray(world.l, inter)))
+		lighting = v_ambient;
+	else
+	{
+		v_diffuse = compute_diffuse(inter, n , world);
+		v_specular = compute_specular(inter, n, v, world);
+		lighting = vec_add(vec_add(v_ambient, v_diffuse), v_specular);
+	}
+	lighting.x -= (lighting.x > 1.0) * (lighting.x - 1.0);
+	lighting.y -= (lighting.y > 1.0) * (lighting.y - 1.0);
+	lighting.z -= (lighting.z > 1.0) * (lighting.z - 1.0);
+	return (lighting);
+}
+
+int	open_file(char *path)
+{
+	int	fd;
+	int	len;
+
+	fd = -1;
+	len = ft_strlen(path);
+	if (path[len - 3] == '.' && path[len - 2] == 'r' && path[len - 1] == 't')
+		fd = open(path, O_RDONLY); // is read-only enough?
+	// call error handling function to exit.
+	return (fd);
+}
+
+int	read_file(int fd, t_world *world)
+{
+	char		*line;
+	int			flag;
+	static int	mask = 0; // bit-mask to check A, C, L should be declared only and at least once.
+
+	flag = 1;
+	while (flag)
+	{
+		line = get_next_line(fd);
+		if (line == 0)
+			break ;
+		if (line[0] != '\0')
+			flag = set_world(line, world, &mask);
+		free(line);
+	}
+	if (!flag || !(mask & 1 << 0 && mask & 1 << 1 && mask & 1 << 2))
+		return (0);
+	return (1);
 }
 
 /////////////////////////////////////////////////////
