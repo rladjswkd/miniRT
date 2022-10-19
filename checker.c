@@ -26,7 +26,8 @@ int	check_identifier(char *type)
 		+ !ft_strncmp("L", type, n) * 3
 		+ !ft_strncmp("sp", type, n) * 4
 		+ !ft_strncmp("pl", type, n) * 5
-		+ !ft_strncmp("cy", type, n) * 6;
+		+ !ft_strncmp("cy", type, n) * 6
+		+ !ft_strncmp("cn", type, n) * 7;
 	return (ret - 1);
 
 	// if (type == 0)
