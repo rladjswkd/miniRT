@@ -23,7 +23,7 @@
 
 //#define	INFINITY	1e500
 #define	S_EXP		32 // specular exponent
-
+// .rt 파일에서 비어있는 줄에 공백이 들어가면 모든 내용이 올바른 형식으로 들어와도 invalid format이라고 뜨고 종료한다. 처리하고싶으면 처리하자.
 typedef struct s_img
 {
 	void	*ptr;
@@ -151,6 +151,7 @@ typedef struct s_equation
 	double	c;
 }	t_equation;
 
+t_vec	get_basis_vec(t_vec);
 
 int	check_rgb(t_rgb rgb)
 {
@@ -960,7 +961,6 @@ t_vec	compute_lighting(t_vec inter, t_vec n, t_vec v, t_world world) // only for
 	t_vec	v_diffuse;
 	t_vec	v_specular;
 	t_vec	lighting;
-
 	v_ambient = vec_scale(rgb_to_vec(world.l.rgb), world.a.intensity);
 	if (check_shadow(world, get_l_ray(world.l, inter)))
 		lighting = v_ambient;
@@ -974,6 +974,58 @@ t_vec	compute_lighting(t_vec inter, t_vec n, t_vec v, t_world world) // only for
 	lighting.y -= (lighting.y > 1.0) * (lighting.y - 1.0);
 	lighting.z -= (lighting.z > 1.0) * (lighting.z - 1.0);
 	return (lighting);
+}
+
+typedef struct s_uv
+{
+	double	u;
+	double	v;
+}	t_uv;
+
+// u increases from 0 to 1 as you move counter-clockwise around the sphere
+// v increases from 0 to 1 as you go from the north pole to the south pole.
+t_uv	uv_map_sphere(t_coord p, t_sp sp)
+{
+	t_uv	uv;
+	t_vec	vec;
+
+	vec = vec_normalize(vec_sub(p, sp.coord));
+	uv.u = 0.5 + atan2(vec.x, vec.y) / (2 * M_PI);
+	uv.v = 0.5 + asin(vec.z) / M_PI;
+	return (uv);
+}
+
+t_uv	uv_map_plane(t_coord p, t_pl pl)
+{
+	t_vec	e1;
+	t_vec	e2;
+
+	e1 = vec_cross(pl.norm, get_basis_vec(pl.norm));
+	e2 = vec_cross(pl.norm, e1);
+	return ((t_uv){vec_dot(p, e1) / P_WID, vec_dot(p, e2) / P_WID});
+}
+
+t_uv	uv_map_cylinder(t_coord p, t_cy cy)
+{
+	t_vec	e1;
+	t_vec	e2;
+	t_uv	ret;
+	t_vec	c_p;
+
+	e1 = vec_cross(cy.norm, get_basis_vec(cy.norm));
+	e2 = vec_cross(cy.norm, e1);
+	c_p = vec_sub(p, cy.coord);
+	ret.u = 0.5 + atan2(vec_dot(c_p, e1), vec_dot(c_p, e2)) / (2 * M_PI);
+	ret.v = vec_len(vec_proj(vec_sub(p, cy.coord), cy.norm)) / cy.height;
+	return (ret);
+}
+
+// u, v are in [0, 1]
+t_rgb	uv_pattern_at(t_uv uv, int w, int h)
+{
+	if (((int)floor(uv.u * w) + (int)floor(uv.v * h)) % 2)
+		return ((t_rgb){0, 255, 0});
+	return ((t_rgb){255, 255, 255});
 }
 
 int	open_file(char *path)
@@ -1019,23 +1071,20 @@ typedef struct s_pixel_info
 }	t_p_info;
 /////////////////////////////////////////////////////
 
-t_vec	get_ab_vec(t_vec v)
+t_vec	get_basis_vec(t_vec v)
 {
-	t_vec	ret;
+	t_vec	bx;
+	t_vec	by;
+	t_vec	bz;
 
-	if (v.x == 0 && v.y == 0 && (v.z == 1 || v.z == -1))
-	{
-		ret.x = 1;
-		ret.y = 0;
-		ret.z = 0;
-	}
-	else
-	{
-		ret.x = 0;
-		ret.y = 0;
-		ret.z = 1;
-	}
-	return (ret);
+	bx = (t_vec){1, 0, 0};
+	by = (t_vec){0, 1, 0};
+	bz = (t_vec){0, 0, 1};
+	if (fabs(vec_dot(v, bx)) < 1e-6)
+		return (bx);
+	else if (fabs(vec_dot(v, bz)) < 1e-6)
+		return (bz);
+	return (by);
 }
 
 void	
@@ -1050,7 +1099,7 @@ get_pixel_info(t_camera c, t_p_info *p_info)
 
 	vp_w = tan((c.fov * M_PI / 180.0) / 2.0) * 2;
 	vp_h = vp_w * ((double)P_HEI / (double)P_WID);
-	h = vec_cross(c.norm, get_ab_vec(c.norm));
+	h = vec_cross(c.norm, get_basis_vec(c.norm));
 	v = vec_cross(c.norm, h);
 	h = vec_scale(h, (double)1 / vec_len(h) * (vp_w / (double)P_WID));
 	v = vec_scale(v, (double)1 / vec_len(v) * (vp_h / (double)P_HEI));
@@ -1076,12 +1125,14 @@ t_ray	generate_ray(t_coord pos, t_p_info p_info, int i, int j)
 	return (ret);
 }
 
-t_rgb	get_obj_rgb(t_obj obj, t_vec lighting)
+t_rgb	get_obj_rgb(t_obj obj, t_coord p, t_vec lighting)
 {
 	t_rgb	ret;
 
+	(void)p;
 	if (obj.type == SPHERE)
-		ret = ((t_sp *)obj.object)->rgb;
+		// ret = ((t_sp *)obj.object)->rgb;
+		ret = uv_pattern_at(uv_map_sphere(p, *((t_sp *)obj.object)), 16, 8);
 	else if (obj.type == CYLINDER)
 		ret = ((t_cy *)obj.object)->rgb;
 	else if (obj.type == PLANE)
