@@ -1,4 +1,4 @@
-NAME = minirt
+NAME = miniRT
 SRCS = checker.c\
        converter.c\
        get_next_line.c\

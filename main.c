@@ -146,7 +146,7 @@ typedef struct s_equation
 	double	c;
 }	t_equation;
 
-t_vec	get_ab_vec(t_vec);
+t_vec	get_basis_vec(t_vec);
 
 int	check_rgb(t_rgb rgb)
 {
@@ -807,37 +807,28 @@ t_uv	uv_map_sphere(t_coord p, t_sp sp)
 
 t_uv	uv_map_plane(t_coord p, t_pl pl)
 {
-	t_vec	coord_to_cam;
 	t_vec	e1;
 	t_vec	e2;
 
-	p = vec_scale(p, 1.0 / P_WID);
-	coord_to_cam = vec_normalize(vec_sub((t_vec){pl.coord.x - 1, pl.coord.y - 1, pl.coord.z - 1}, pl.coord));
-	e1 = vec_sub(coord_to_cam, vec_proj(coord_to_cam, pl.norm));
-	e2 = vec_cross(pl.norm, coord_to_cam);
-	return ((t_uv){vec_dot(p, e1), vec_dot(p, e2)});
-	// (void)camera;
-	// p = vec_scale(p, 1.0 / P_WID);
-	// if (fabs(pl.norm.y) > 1e-6)
-	// 	return ((t_uv){p.x - floor(p.x), p.z - floor(p.z)});
-	// else if (fabs(pl.norm.x) > 1e-6)
-	// 	return ((t_uv){p.y - floor(p.y), p.z - floor(p.z)});
-	// return ((t_uv){p.x - floor(p.x), p.y - floor(p.y)});
+	e1 = vec_cross(pl.norm, get_basis_vec(pl.norm));
+	e2 = vec_cross(pl.norm, e1);
+	return ((t_uv){vec_dot(p, e1) / P_WID, vec_dot(p, e2) / P_WID});
 }
 
-// t_uv	uv_map_cylinder(t_coord p, t_cy cy)
-// {
-// 	t_vec	e1;
-// 	t_vec	e2;
-// 	double	p1;
-// 	double	p2;
+t_uv	uv_map_cylinder(t_coord p, t_cy cy)
+{
+	t_vec	e1;
+	t_vec	e2;
+	t_uv	ret;
+	t_vec	c_p;
 
-// 	e1 = vec_normalize(vec_cross(cy.norm, vec_sub(p, cy.coord)));
-// 	e2 = vec_normalize(vec_cross(cy.norm, e1));
-// 	p1 = vec_dot(p, e1);
-// 	p2 = vec_dot(p, e2);
-// 	return ((t_uv){1 - (atan2(p1, p2) / (2 * M_PI) + 0.5), cy.norm - floor(p.z)});
-// }
+	e1 = vec_cross(cy.norm, get_basis_vec(cy.norm));
+	e2 = vec_cross(cy.norm, e1);
+	c_p = vec_sub(p, cy.coord);
+	ret.u = 0.5 + atan2(vec_dot(c_p, e1), vec_dot(c_p, e2)) / (2 * M_PI);
+	ret.v = vec_len(vec_proj(vec_sub(p, cy.coord), cy.norm)) / cy.height;
+	return (ret);
+}
 
 // u, v are in [0, 1]
 t_rgb	uv_pattern_at(t_uv uv, int w, int h)
@@ -961,23 +952,20 @@ typedef struct s_pixel_info
 }	t_p_info;
 /////////////////////////////////////////////////////
 
-t_vec	get_ab_vec(t_vec v)
+t_vec	get_basis_vec(t_vec v)
 {
-	t_vec	ret;
+	t_vec	bx;
+	t_vec	by;
+	t_vec	bz;
 
-	if (fabs(v.x) < 1e-6 && fabs(v.y) < 1e-6 && (fabs(v.z - 1) < 1e-6 || fabs(v.z - 1) < 1e-6))
-	{
-		ret.x = 1;
-		ret.y = 0;
-		ret.z = 0;
-	}
-	else
-	{
-		ret.x = 0;
-		ret.y = 0;
-		ret.z = 1;
-	}
-	return (ret);
+	bx = (t_vec){1, 0, 0};
+	by = (t_vec){0, 1, 0};
+	bz = (t_vec){0, 0, 1};
+	if (fabs(vec_dot(v, bx)) < 1e-6)
+		return (bx);
+	else if (fabs(vec_dot(v, bz)) < 1e-6)
+		return (bz);
+	return (by);
 }
 
 void	get_pixel_info(t_camera c, t_p_info *p_info)
@@ -990,7 +978,7 @@ void	get_pixel_info(t_camera c, t_p_info *p_info)
 
 	vp_w = tan((c.fov * M_PI / 180.0) / 2.0) * 2;
 	vp_h = vp_w * ((double)P_HEI / (double)P_WID);
-	h = vec_cross(c.norm, get_ab_vec(c.norm));
+	h = vec_cross(c.norm, get_basis_vec(c.norm));
 	v = vec_cross(c.norm, h);
 	h = vec_scale(h, (double)1 / vec_len(h) * (vp_w / (double)P_WID));
 	v = vec_scale(v, (double)1 / vec_len(v) * (vp_h / (double)P_HEI));
@@ -1025,11 +1013,11 @@ t_rgb	get_obj_rgb(t_obj obj, t_coord p, t_vec lighting)
 		// ret = ((t_sp *)obj.object)->rgb;
 		ret = uv_pattern_at(uv_map_sphere(p, *((t_sp *)obj.object)), 16, 8);
 	else if (obj.type == CYLINDER)
-		ret = ((t_cy *)obj.object)->rgb;
-		// ret = uv_pattern_at(uv_map_cylinder(p, *((t_cy *)obj.object)), 16, 8);
+		// ret = ((t_cy *)obj.object)->rgb;
+		ret = uv_pattern_at(uv_map_cylinder(p, *((t_cy *)obj.object)), 16, 8);
 	else
 		// ret = ((t_pl *)obj.object)->rgb;
-		ret = uv_pattern_at(uv_map_plane(p, *((t_pl *)obj.object)), 16, 16);
+		ret = uv_pattern_at(uv_map_plane(p, *((t_pl *)obj.object)), 160, 160);
 	return (mult_rgb_vec(ret, lighting));
 }
 
