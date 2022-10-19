@@ -894,7 +894,6 @@ int	check_shadow_pl(t_ray ray, t_node *pl)
 t_ray	get_l_ray(t_light l, t_vec p)
 {
 	t_ray	l_ray;
-	t_vec	t_pos;
 
 	l_ray.dir = vec_sub(l.coord, p);
 	l_ray.pos = vec_sub(p, l_ray.dir);
@@ -1020,11 +1019,16 @@ t_uv	uv_map_cylinder(t_coord p, t_cy cy)
 	return (ret);
 }
 
+t_uv	uv_map_cone(t_coord p, t_cn cn)
+{
+	return (uv_map_cylinder(p, (t_cy)cn));
+}
+
 // u, v are in [0, 1]
 t_rgb	uv_pattern_at(t_uv uv, int w, int h)
 {
 	if (((int)floor(uv.u * w) + (int)floor(uv.v * h)) % 2)
-		return ((t_rgb){0, 255, 0});
+		return ((t_rgb){0, 0, 255});
 	return ((t_rgb){255, 255, 255});
 }
 
@@ -1129,16 +1133,20 @@ t_rgb	get_obj_rgb(t_obj obj, t_coord p, t_vec lighting)
 {
 	t_rgb	ret;
 
-	(void)p;
+	(void)p; //
+	ret = (t_rgb){0, 0, 0};
 	if (obj.type == SPHERE)
-		// ret = ((t_sp *)obj.object)->rgb;
-		ret = uv_pattern_at(uv_map_sphere(p, *((t_sp *)obj.object)), 16, 8);
-	else if (obj.type == CYLINDER)
-		ret = ((t_cy *)obj.object)->rgb;
+		ret = ((t_sp *)obj.object)->rgb;
+		// ret = uv_pattern_at(uv_map_sphere(p, *((t_sp *)obj.object)), 16, 8);
 	else if (obj.type == PLANE)
 		ret = ((t_pl *)obj.object)->rgb;
+		// ret = uv_pattern_at(uv_map_plane(p, *((t_pl *)obj.object)), 160, 160);
+	else if (obj.type == CYLINDER)
+		ret = ((t_cy *)obj.object)->rgb;
+		// ret = uv_pattern_at(uv_map_cylinder(p, *((t_cy *)obj.object)), 16, 8);
 	else if (obj.type == CONE)
 		ret = ((t_cn *)obj.object)->rgb;
+		// ret = uv_pattern_at(uv_map_cone(p, *((t_cn *)obj.object)), 16, 8);
 	return (mult_rgb_vec(ret, lighting));
 }
 
@@ -1196,45 +1204,46 @@ t_vec	get_tangent_norm_pl(t_pl *pl, t_vec ray_dir)
 	return (pl->norm);
 }
 
-// t_vec	get_tangent_norm_cn(t_cn *cn, t_coord p, t_vec ray_dir)
-// {
-// 	double	a;
-// 	double	b;
-// 	t_coord	t_c;
+t_vec	get_tangent_norm_cn(t_cn *cn, t_coord p, t_vec ray_dir)
+{
+	double	a;
+	double	b;
+	t_coord	t_c;
 
-// 	a = vec_dot(p, cn->norm);
-// 	b = vec_dot(vec_add(cn->coord, vec_scale(cn->norm, cn->height)), cn->norm);
-// 	if (fabs(a - b) < 1e-6)
-// 	{
-// 		if (vec_dot(ray_dir, cn->norm) > 0)
-// 			return (vec_scale(cn->norm, -1));
-// 		return (cn->norm);
-// 	}
-// 	b = vec_dot(cn->coord, cn->norm);
-// 	if (fabs(a - b) < 1e-6)
-// 	{
-// 		if (vec_dot(ray_dir, cn->norm) > 0)
-// 			return (cn->norm);
-// 		return (vec_scale(cn->norm, -1));
-// 	}
-// 	t_c = vec_add(cn->coord, vec_scale(cn->norm, fabs(a - b)));
-// 	if (vec_dot(ray_dir, vec_sub(p, t_c)) > 0)
-// 		return (vec_normalize(vec_sub(t_c, p)));
-// 	return (vec_normalize(vec_sub(p, t_c)));
-// }
+	a = vec_dot(p, cn->norm);
+	b = vec_dot(vec_add(cn->coord, vec_scale(cn->norm, cn->height)), cn->norm);
+	if (fabs(a - b) < 1e-6)
+	{
+		if (vec_dot(ray_dir, cn->norm) > 0)
+			return (vec_scale(cn->norm, -1));
+		return (cn->norm);
+	}
+	b = vec_dot(cn->coord, cn->norm);
+	if (fabs(a - b) < 1e-6)
+	{
+		if (vec_dot(ray_dir, cn->norm) > 0)
+			return (cn->norm);
+		return (vec_scale(cn->norm, -1));
+	}
+	t_c = vec_add(cn->coord, vec_scale(cn->norm, fabs(a - b)));
+	if (vec_dot(ray_dir, vec_sub(p, t_c)) > 0)
+		return (vec_normalize(vec_sub(t_c, p)));
+	return (vec_normalize(vec_sub(p, t_c)));
+}
 
 t_vec	get_tangent_norm(t_obj	obj, t_coord p, t_vec ray_dir)
 {
 	t_vec	n;
 
+	n = (t_vec){0, 0, 0};
 	if (obj.type == SPHERE)
 		n = get_tangent_norm_sp(obj.object, p, ray_dir);
 	else if (obj.type == CYLINDER)
 		n = get_tangent_norm_cy(obj.object, p, ray_dir);
 	else if (obj.type == PLANE)
 		n = get_tangent_norm_pl(obj.object, ray_dir);
-	// else if (obj.type == CONE)
-	// 	n = get_tangent_norm_cn(obj.object, p, ray_dir);
+	else if (obj.type == CONE)
+		n = get_tangent_norm_cn(obj.object, p, ray_dir);
 	return (n);
 }
 
@@ -1250,7 +1259,7 @@ int	trace_ray(t_img *img, t_world *world, t_ray ray, int i)
 	//background color
 	p = vec_add(ray.pos, vec_scale(ray.dir, obj.t));
 	n = get_tangent_norm(obj, p, ray.dir);
-	color = get_obj_rgb(obj,
+	color = get_obj_rgb(obj, p,
 		compute_lighting(p, n, vec_neg(vec_normalize(ray.dir)), *world));
 	dot_pixel(img, color, i);
 	return (0);
