@@ -18,8 +18,8 @@
 #define UP			126
 #define RIGHT		124
 #define DOWN		125
-#define P_WID 		1280
-#define P_HEI		720
+#define P_WID 		1920
+#define P_HEI		1080
 
 //#define	INFINITY	1e500
 #define	S_EXP		32 // specular exponent
@@ -875,6 +875,22 @@ int	check_shadow_cy(t_ray ray, t_node *cy)
 	return (0);
 }
 
+int	check_shadow_cn(t_ray ray, t_node *cn)
+{
+	double	cur;
+
+	cur = 2;
+	if (!cn)
+		return (0);
+	while (cn)
+	{
+		if (intersect_cone(ray, *((t_cn *)(cn->data)), &cur) && cur < 2)
+			return (1);
+		cn = cn->next;
+	}
+	return (0);
+}
+
 int	check_shadow_pl(t_ray ray, t_node *pl)
 {
 	double	cur;
@@ -908,6 +924,8 @@ int	check_shadow(t_world world, t_ray l_ray)
 	if (check_shadow_cy(l_ray, world.cy))
 		return (1);
 	if (check_shadow_pl(l_ray, world.pl))
+		return (1);
+	if (check_shadow_cn(l_ray, world.cn))
 		return (1);
 	return (0);
 }
@@ -1091,9 +1109,14 @@ t_vec	get_basis_vec(t_vec v)
 	return (by);
 }
 
-void	
+t_vec	get_viewport_vec(t_vec v)
+{
+	if (vec_len(vec_cross(v, (t_vec){0, 0, 1})) < 1e-6)
+		return ((t_vec){1, 0, 0});
+	return ((t_vec){0, 0, 1});
+}
 
-get_pixel_info(t_camera c, t_p_info *p_info)
+void	get_pixel_info(t_camera c, t_p_info *p_info)
 {
 	t_vec	h;
 	t_vec	v;
@@ -1103,7 +1126,7 @@ get_pixel_info(t_camera c, t_p_info *p_info)
 
 	vp_w = tan((c.fov * M_PI / 180.0) / 2.0) * 2;
 	vp_h = vp_w * ((double)P_HEI / (double)P_WID);
-	h = vec_cross(c.norm, get_basis_vec(c.norm));
+	h = vec_cross(c.norm, get_viewport_vec(c.norm));
 	v = vec_cross(c.norm, h);
 	h = vec_scale(h, (double)1 / vec_len(h) * (vp_w / (double)P_WID));
 	v = vec_scale(v, (double)1 / vec_len(v) * (vp_h / (double)P_HEI));
@@ -1136,8 +1159,8 @@ t_rgb	get_obj_rgb(t_obj obj, t_coord p, t_vec lighting)
 	(void)p; //
 	ret = (t_rgb){0, 0, 0};
 	if (obj.type == SPHERE)
-		ret = ((t_sp *)obj.object)->rgb;
-		// ret = uv_pattern_at(uv_map_sphere(p, *((t_sp *)obj.object)), 16, 8);
+		// ret = ((t_sp *)obj.object)->rgb;
+		ret = uv_pattern_at(uv_map_sphere(p, *((t_sp *)obj.object)), 16, 8);
 	else if (obj.type == PLANE)
 		ret = ((t_pl *)obj.object)->rgb;
 		// ret = uv_pattern_at(uv_map_plane(p, *((t_pl *)obj.object)), 160, 160);
@@ -1296,7 +1319,6 @@ int	main(int argc, char **argv)
 
 	if (argc != 2)
 		return (0); // call error handling function with proper error message.
-	init_mlx_pointers(&vars);
 	fd = open_file(argv[1]);
 	if (fd < 0) // remove this when error handling function is completed.
 		return (0); // 에러 문자열 출력하고 처리해주기
@@ -1305,15 +1327,18 @@ int	main(int argc, char **argv)
 	world.cy = 0;
 	world.cn = 0;
 	if (read_file(fd, &world))
+	{
+		init_mlx_pointers(&vars);
 		printf("%s\n", "valid format");
+		/* draw image */
+		draw_img(&world, &vars);
+		mlx_loop(vars.mlx);
+	}
 	else
 		printf("%s\n", "invalid format");
-	/* draw image */
-	draw_img(&world, &vars);
 	clear_list(&(world.sp));
 	clear_list(&(world.pl));
 	clear_list(&(world.cy));
 	clear_list(&(world.cn));
-	mlx_loop(vars.mlx);
 	return (0);
 }
