@@ -1211,8 +1211,8 @@ t_vec	get_tangent_norm_cy(t_cy *cy, t_coord p, t_vec ray_dir)
 	if (fabs(a - b) < 1e-6)
 	{
 		if (vec_dot(ray_dir, cy->norm) > 0)
-			return (cy->norm);
-		return (vec_scale(cy->norm, -1));
+			return (vec_scale(cy->norm, -1));
+		return (cy->norm);
 	}
 	t_c = vec_add(cy->coord, vec_scale(cy->norm, fabs(a - b)));
 	if (vec_dot(ray_dir, vec_sub(p, t_c)) > 0)
@@ -1245,8 +1245,8 @@ t_vec	get_tangent_norm_cn(t_cn *cn, t_coord p, t_vec ray_dir)
 	if (fabs(a - b) < 1e-6)
 	{
 		if (vec_dot(ray_dir, cn->norm) > 0)
-			return (cn->norm);
-		return (vec_scale(cn->norm, -1));
+			return (vec_scale(cn->norm, -1));
+		return (cn->norm);
 	}
 	t_c = vec_add(cn->coord, vec_scale(cn->norm, fabs(a - b)));
 	if (vec_dot(ray_dir, vec_sub(p, t_c)) > 0)
