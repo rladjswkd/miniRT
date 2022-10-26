@@ -26,8 +26,8 @@
 #define P_HEI		1080
 #define THREAD		8
 #define R_RAD		M_PI / 18
-#define Q			113 // linux 113
-#define E			101 // linux 101
+#define Q			12 // linux 113
+#define E			14 // linux 101
 #define W			97  // linux 97
 #define A			115 // linux 115
 #define S			113 // linux 113
@@ -187,8 +187,8 @@ typedef struct s_pixel_info
 
 typedef struct s_thread_pram
 {
+	t_img		*img;
 	t_world		*world;
-	t_vars		*vars;
 	t_p_info	p_info;
 	int			index;
 	pthread_t	thread_id;
@@ -201,6 +201,7 @@ typedef struct s_vars
 	t_img		img;
 	t_obj		obj;
 	t_world		world;
+	t_thread_pram *pram;
 }	t_vars;
 
 int	check_rgb(t_rgb rgb)
@@ -1429,13 +1430,13 @@ void	*drawing(void *b_pram)
 		while (++i < P_WID)
 		{
 			ray = generate_ray(pram.world->c.coord, pram.p_info, i, j);
-			trace_ray(&pram.vars->img, pram.world, ray, j * P_WID + i);
+			trace_ray(pram.img, pram.world, ray, j * P_WID + i);
 		}
 	}
 	return (0);
 }
 
-int draw_img(t_world *world, t_vars *vars, t_thread_pram *pram)
+int draw_img(t_world *world, t_vars *vars)
 {
 	t_p_info	p_info;
 	void		*tmp;
@@ -1445,13 +1446,13 @@ int draw_img(t_world *world, t_vars *vars, t_thread_pram *pram)
 	i = -1;
 	while (++i < THREAD)
 	{
-		pram[i].p_info = p_info;
-		if (pthread_create(&(pram[i].thread_id), NULL, drawing, pram + i))
+		vars->pram[i].p_info = p_info;
+		if (pthread_create(&(vars->pram[i].thread_id), NULL, drawing, vars->pram + i))
 			return (0);
 	}
 	i = -1;
 	while (++i < THREAD)
-		pthread_join(pram[i].thread_id, &tmp);
+		pthread_join(vars->pram[i].thread_id, &tmp);
 	mlx_put_image_to_window(vars->mlx, vars->win, vars->img.ptr, 0, 0);
 	return (1);
 }
@@ -1468,7 +1469,7 @@ int	create_thread_pram(t_world *world, t_vars *vars, t_thread_pram **pram)
 	i = -1;
 	while (++i < THREAD)
 	{
-		ret[i].vars = vars;
+		ret[i].img = &vars->img;
 		ret[i].world = world;
 		ret[i].index = i;
 	}
@@ -1547,7 +1548,8 @@ int	main(int argc, char **argv)
 			//free
 			return (1);
 		}
-		if (!draw_img(&world, &vars, pram))
+		vars.pram = pram;
+		if (!draw_img(&world, &vars))
 		{
 			//free
 			return (1);
