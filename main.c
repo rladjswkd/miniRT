@@ -7,6 +7,7 @@
 #include "converter.h"
 #include "checker.h"
 #include "mlx.h"
+#include <pthread.h>
 
 #define SPHERE		1
 #define	CYLINDER	2
@@ -20,6 +21,7 @@
 #define DOWN		125
 #define P_WID 		1920
 #define P_HEI		1080
+#define THREAD		8
 
 //#define	INFINITY	1e500
 #define	S_EXP		32 // specular exponent
@@ -68,7 +70,6 @@ typedef struct s_light
 	double	intensity;
 	t_rgb	rgb;
 }	t_light;
-
 
 typedef struct s_camera
 {
@@ -152,6 +153,22 @@ typedef struct s_equation
 }	t_equation;
 
 t_vec	get_basis_vec(t_vec);
+
+typedef struct s_pixel_info
+{
+	t_coord	top_left;
+	t_vec	p_h;
+	t_vec	p_v;
+}	t_p_info;
+
+typedef struct s_thread_pram
+{
+	t_world		*world;
+	t_vars		*vars;
+	t_p_info	p_info;
+	int			index;
+	pthread_t	thread_id;
+}	t_thread_pram;
 
 int	check_rgb(t_rgb rgb)
 {
@@ -1084,15 +1101,6 @@ int	read_file(int fd, t_world *world)
 	return (1);
 }
 
-/////////////////////////////////////////////////////
-typedef struct s_pixel_info
-{
-	t_coord	top_left;
-	t_vec	p_h;
-	t_vec	p_v;
-}	t_p_info;
-/////////////////////////////////////////////////////
-
 t_vec	get_basis_vec(t_vec v)
 {
 	t_vec	bx;
@@ -1288,34 +1296,73 @@ int	trace_ray(t_img *img, t_world *world, t_ray ray, int i)
 	return (0);
 }
 /////////////////////////////////////////////////////
-
-int draw_img(t_world *world, t_vars *vars)
+void	*drawing(void *b_pram)
 {
-	t_p_info	p_info;
-	t_ray		ray;
-	int			i;
-	int			j;
+	t_thread_pram	pram;
+	t_ray			ray;
+	int				i;
+	int				j;
 
-	get_pixel_info(world->c, &p_info);
-	j = -1;
-	while (++j < P_HEI)
+	pram = *(t_thread_pram *)b_pram;
+	j = pram.index * (P_HEI / THREAD) - 1;
+	while (++j < (pram.index + 1) * (P_HEI / THREAD))
 	{
 		i = -1;
 		while (++i < P_WID)
 		{
-			ray = generate_ray(world->c.coord, p_info, i, j);
-			trace_ray(&vars->img, world, ray, j * P_WID + i);
+			ray = generate_ray(pram.world->c.coord, pram.p_info, i, j);
+			trace_ray(&pram.vars->img, pram.world, ray, j * P_WID + i);
 		}
 	}
+	return (0);
+}
+
+int draw_img(t_world *world, t_vars *vars, t_thread_pram *pram)
+{
+	t_p_info	p_info;
+	void		*tmp;
+	int			i;
+
+	get_pixel_info(world->c, &p_info);
+	i = -1;
+	while (++i < THREAD)
+	{
+		pram[i].p_info = p_info;
+		if (pthread_create(&(pram[i].thread_id), NULL, drawing, pram + i))
+			return (0);
+	}
+	i = -1;
+	while (++i < THREAD)
+		pthread_join(pram[i].thread_id, &tmp);
 	mlx_put_image_to_window(vars->mlx, vars->win, vars->img.ptr, 0, 0);
+	return (1);
+}
+
+int	create_thread_pram(t_world *world, t_vars *vars, t_thread_pram **pram)
+{
+	t_thread_pram	*ret;
+	int				i;
+
+	ret = (t_thread_pram *)malloc(sizeof(t_thread_pram) * THREAD);
+	if (ret == NULL)
+		return (0);
+	i = -1;
+	while (++i < THREAD)
+	{
+		ret[i].vars = vars;
+		ret[i].world = world;
+		ret[i].index = i;
+	}
+	*pram = ret;
 	return (1);
 }
 
 int	main(int argc, char **argv)
 {
-	int			fd;
-	t_world		world;
-	t_vars		vars;
+	int				fd;
+	t_world			world;
+	t_vars			vars;
+	t_thread_pram	*pram;
 
 	if (argc != 2)
 		return (0); // call error handling function with proper error message.
@@ -1326,12 +1373,21 @@ int	main(int argc, char **argv)
 	world.pl = 0;
 	world.cy = 0;
 	world.cn = 0;
+	pram = NULL;
 	if (read_file(fd, &world))
 	{
 		init_mlx_pointers(&vars);
 		printf("%s\n", "valid format");
-		/* draw image */
-		draw_img(&world, &vars);
+		if (!create_thread_pram(&world, &vars, &pram))
+		{
+			//free
+			return (1);
+		}
+		if (!draw_img(&world, &vars, pram))
+		{
+			//free
+			return (1);
+		}
 		mlx_loop(vars.mlx);
 	}
 	else
