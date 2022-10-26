@@ -9,10 +9,13 @@
 #include "mlx.h"
 #include <pthread.h>
 
+#define	NONE		0
 #define SPHERE		1
-#define	CYLINDER	2
-#define	PLANE		3
+#define CYLINDER	2
+#define PLANE		3
 #define CONE		4
+#define CAMERA		5
+#define LIGHT		6
 #define SHADOW_BIAS 1.00001
 #define ESC_KEY		53
 #define LEFT		123
@@ -22,7 +25,13 @@
 #define P_WID 		1920
 #define P_HEI		1080
 #define THREAD		8
-
+#define R_RAD		M_PI / 18
+#define Q			113 // linux 113
+#define E			101 // linux 101
+#define W			97  // linux 97
+#define A			115 // linux 115
+#define S			113 // linux 113
+#define D			101 // linux 101
 //#define	INFINITY	1e500
 #define	S_EXP		32 // specular exponent
 // .rt 파일에서 비어있는 줄에 공백이 들어가면 모든 내용이 올바른 형식으로 들어와도 invalid format이라고 뜨고 종료한다. 처리하고싶으면 처리하자.
@@ -35,12 +44,12 @@ typedef struct s_img
 	int		endian;
 }	t_img;
 
-typedef struct s_vars
+typedef struct s_obj
 {
-	void		*mlx;
-	void		*win;
-	t_img		img;
-}	t_vars;
+	int		type;
+	void	*object;
+	double	t;
+}	t_obj;
 
 typedef struct s_rgb
 {
@@ -57,6 +66,12 @@ typedef struct s_coordinate
 }	t_coord;
 
 typedef	t_coord	t_vec;
+
+typedef struct s_obj_info
+{
+	t_coord	coord;
+	t_vec	norm;
+}	t_obj_info;
 
 typedef struct s_ambient
 {
@@ -120,13 +135,6 @@ typedef struct s_world
 	t_node		*cn;
 }	t_world;
 
-typedef struct s_object
-{
-	int		type;
-	void	*object;
-	double	t;
-}	t_obj;
-
 typedef struct s_ray
 {
 	t_vec	pos;
@@ -152,6 +160,22 @@ typedef struct s_equation
 	double	c;
 }	t_equation;
 
+typedef struct s_vec4
+{
+	double	x;
+	double	y;
+	double	z;
+	double	w;
+}	t_vec4;
+
+typedef struct s_mat
+{
+	t_vec4	r1;
+	t_vec4	r2;
+	t_vec4	r3;
+	t_vec4	r4;
+}	t_mat;
+
 t_vec	get_basis_vec(t_vec);
 
 typedef struct s_pixel_info
@@ -170,6 +194,15 @@ typedef struct s_thread_pram
 	pthread_t	thread_id;
 }	t_thread_pram;
 
+typedef struct s_vars
+{
+	void		*mlx;
+	void		*win;
+	t_img		img;
+	t_obj		obj;
+	t_world		world;
+}	t_vars;
+
 int	check_rgb(t_rgb rgb)
 {
 	int	r;
@@ -182,7 +215,7 @@ int	check_rgb(t_rgb rgb)
 	return (-1 < r && r < 256 && -1 < g && g < 256 && -1 < b && b < 256);
 }
 
-int	init_mlx_pointers(t_vars *vars)
+int	init_mlx_pointers(t_vars *vars, t_world world)
 {
 	vars->mlx = mlx_init();
 	if (!vars->mlx)
@@ -197,6 +230,10 @@ int	init_mlx_pointers(t_vars *vars)
 			&vars->img.line_length, &vars->img.endian);
 	if (!vars->img.addr)
 		return (0);
+	vars->obj.type = NONE;
+	vars->obj.object = 0;
+	vars->obj.t = 0;
+	vars->world = world;
 	return (1);
 }
 
@@ -586,6 +623,61 @@ t_vec	vec_neg(t_vec vec)
 {
 	return ((t_vec){-vec.x, -vec.y, -vec.z});
 }
+
+/********************matrices*************************/
+// double	vec4_dot(t_vec4 v1, t_vec4 v2)
+// {
+// 	return (v1.x * v2.x + v1.y * v2.y + v1.z * v2.z + v1.w * v2.w);
+// }
+
+// t_vec4	get_vec4(t_vec v)
+// {
+// 	return ((t_vec4){v.x, v.y, v.z, 1});
+// }
+
+// t_mat	mat_transpose(t_mat	mat)
+// {
+// 	return ((t_mat){mat.r1.x, mat.r2.x, mat.r3.x, mat.r4.x,
+// 		mat.r1.y, mat.r2.y, mat.r3.y, mat.r4.y,
+// 		mat.r1.z, mat.r2.z, mat.r3.z, mat.r4.z,
+// 		mat.r1.w, mat.r2.w, mat.r3.w, mat.r4.w});
+// }
+
+// double	met_determinant(t_mat mat) // if return value is 0(smaller than 1e-6 in code), there is no inverse matrix
+// {
+
+// }
+
+// t_mat	mat_inverse(t_mat mat)
+// {
+
+// }
+
+// t_vec4	mat_mul_vec4(t_mat mat, t_vec4 v)
+// {
+// 	return ((t_vec4){vec4_dot(mat.r1, v), vec4_dot(mat.r2, v),
+// 		vec4_dot(mat.r3, v), vec4_dot(mat.r4, v)});
+// }
+
+// t_mat	mat_mul_mat(t_mat mat1, t_mat mat2)
+// {
+// 	t_mat	mat2T;
+
+// 	mat2T = mat_transpose(mat2);
+// 	return ((t_mat){mat_mul_vec4(mat2T, mat1.r1), mat_mul_vec4(mat2T, mat1.r2),
+// 		mat_mul_vec4(mat2T, mat1.r3), mat_mul_vec4(mat2T, mat1.r4)});
+// }
+
+// t_mat	mat_translation(double x, double y, double z)
+// {
+// 	return ((t_mat){{1, 0, 0, x}, {0, 1, 0, y}, {0, 0, 1, z}, {0, 0, 0, 1}});
+// }
+
+// t_mat	mat_rotation(void)
+// {
+	
+// }
+/***************************************************************************/
 
 double	choose_smaller_t(double current, double candidate, int condition)
 {
@@ -1296,6 +1388,32 @@ int	trace_ray(t_img *img, t_world *world, t_ray ray, int i)
 	return (0);
 }
 /////////////////////////////////////////////////////
+
+t_vec	vec_translate(t_vec v, double dx, double dy, double dz)
+{
+	return ((t_vec){v.x + dx, v.y + dy, v.z + dz});
+}
+
+t_vec	vec_rotate_v(t_vec forward)
+{
+	t_vec	up;
+	t_vec	right;
+
+	right = vec_normalize(vec_cross(forward, get_viewport_vec(forward)));
+	up = vec_normalize(vec_cross(right, forward));
+	return (vec_add(vec_scale(forward, cos(R_RAD)), vec_scale(up, sin(R_RAD))));
+}
+
+// forward and right are on a plane and up is it's forward.
+// forward length is always 1.
+t_vec	vec_rotate_h(t_vec forward)
+{
+	t_vec	right;
+
+	right = vec_normalize(vec_cross(forward, get_viewport_vec(forward)));
+	return (vec_add(vec_scale(forward, cos(R_RAD)), vec_scale(right, sin(R_RAD))));
+}
+
 void	*drawing(void *b_pram)
 {
 	t_thread_pram	pram;
@@ -1338,6 +1456,7 @@ int draw_img(t_world *world, t_vars *vars, t_thread_pram *pram)
 	return (1);
 }
 
+
 int	create_thread_pram(t_world *world, t_vars *vars, t_thread_pram **pram)
 {
 	t_thread_pram	*ret;
@@ -1356,6 +1475,51 @@ int	create_thread_pram(t_world *world, t_vars *vars, t_thread_pram **pram)
 	*pram = ret;
 	return (1);
 }
+
+void	rotate_object(t_obj obj, int keycode)
+{
+	int			type;
+	t_vec		rotated;
+	t_obj_info	*info;
+
+	type = obj.type;
+	if (type == CYLINDER || type == PLANE || type == CONE || type == CAMERA)
+	{
+		info = (t_obj_info *)(obj.object);
+		printf("info normal : <%f, %f, %f>\n", info->norm.x, info->norm.y, info->norm.z);
+		printf("obj  normal : <%f, %f, %f>\n", ((t_cy *)(obj.object))->norm.x, ((t_cy *)(obj.object))->norm.y, ((t_cy *)(obj.object))->norm.z);
+		if (keycode == Q)
+			rotated = vec_rotate_v(info->norm);
+		else
+			rotated = vec_rotate_h(info->norm);
+		info->norm = rotated;
+		printf("info normal : <%f, %f, %f>\n", info->norm.x, info->norm.y, info->norm.z);
+		printf("obj  normal : <%f, %f, %f>\n", ((t_cy *)(obj.object))->norm.x, ((t_cy *)(obj.object))->norm.y, ((t_cy *)(obj.object))->norm.z);
+	}
+}
+
+int	key_press_handler(int keycode, t_vars *vars)
+{
+	printf("type is %d\n", vars->obj.type);
+	printf("keycode is %d\n", keycode);
+	if (vars->obj.type == NONE)
+		return (0);
+	if (keycode == Q || keycode == E)
+		rotate_object(vars->obj, keycode);
+	// else if (keycode == W || keycode == A || keycode == D || keycode == D)
+		// WASD should be one of the parameters of the function going to be called here.
+	draw_img(&(vars->world), vars);
+	return (0);
+}
+
+// int	main(void) //keycode tester
+// {
+// 	t_vars		vars;
+
+// 	init_mlx_pointers(&vars);
+// 	mlx_key_hook(vars.win, key_press_handler, &vars);
+// 	mlx_loop(vars.mlx);
+// }
 
 int	main(int argc, char **argv)
 {
@@ -1376,7 +1540,7 @@ int	main(int argc, char **argv)
 	pram = NULL;
 	if (read_file(fd, &world))
 	{
-		init_mlx_pointers(&vars);
+		init_mlx_pointers(&vars, world);
 		printf("%s\n", "valid format");
 		if (!create_thread_pram(&world, &vars, &pram))
 		{
@@ -1388,6 +1552,9 @@ int	main(int argc, char **argv)
 			//free
 			return (1);
 		}
+		vars.obj.type = CYLINDER;
+		vars.obj.object = world.cy->data;
+		mlx_key_hook(vars.win, key_press_handler, &vars);
 		mlx_loop(vars.mlx);
 	}
 	else
