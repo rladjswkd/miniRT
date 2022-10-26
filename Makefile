@@ -14,7 +14,7 @@ RM = rm
 RMFLAGS = -f
 
 %.o : %.c
-	$(CC) $(CFLAGS) -Imlx -g -c $< -o $@
+	$(CC) $(CFLAGS) -Imlx -g -O3 -c $< -o $@
 
 all : $(NAME)
 
