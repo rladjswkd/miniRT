@@ -185,14 +185,14 @@ typedef struct s_pixel_info
 	t_vec	p_v;
 }	t_p_info;
 
-typedef struct s_thread_pram
+typedef struct s_thread_param
 {
 	t_img		*img;
 	t_world		*world;
 	t_p_info	p_info;
 	int			index;
 	pthread_t	thread_id;
-}	t_thread_pram;
+}	t_thread_param;
 
 typedef struct s_vars
 {
@@ -201,7 +201,7 @@ typedef struct s_vars
 	t_img		img;
 	t_obj		obj;
 	t_world		world;
-	t_thread_pram *pram;
+	t_thread_param *param;
 }	t_vars;
 
 int	check_rgb(t_rgb rgb)
@@ -1379,12 +1379,14 @@ int	trace_ray(t_img *img, t_world *world, t_ray ray, int i)
 	t_vec	n;
 
 	if (!intersect(ray, *world, &obj))
-		return (0);
-	//background color
-	p = vec_add(ray.pos, vec_scale(ray.dir, obj.t));
-	n = get_tangent_norm(obj, p, ray.dir);
-	color = get_obj_rgb(obj, p,
-		compute_lighting(p, n, vec_neg(vec_normalize(ray.dir)), *world));
+		color = (t_rgb){0, 0, 0}; //background color
+	else
+	{
+		p = vec_add(ray.pos, vec_scale(ray.dir, obj.t));
+		n = get_tangent_norm(obj, p, ray.dir);
+		color = get_obj_rgb(obj, p,
+			compute_lighting(p, n, vec_neg(vec_normalize(ray.dir)), *world));
+	}
 	dot_pixel(img, color, i);
 	return (0);
 }
@@ -1415,22 +1417,22 @@ t_vec	vec_rotate_h(t_vec forward)
 	return (vec_add(vec_scale(forward, cos(R_RAD)), vec_scale(right, sin(R_RAD))));
 }
 
-void	*drawing(void *b_pram)
+void	*drawing(void *b_param)
 {
-	t_thread_pram	pram;
+	t_thread_param	param;
 	t_ray			ray;
 	int				i;
 	int				j;
 
-	pram = *(t_thread_pram *)b_pram;
-	j = pram.index * (P_HEI / THREAD) - 1;
-	while (++j < (pram.index + 1) * (P_HEI / THREAD))
+	param = *(t_thread_param *)b_param;
+	j = param.index * (P_HEI / THREAD) - 1;
+	while (++j < (param.index + 1) * (P_HEI / THREAD))
 	{
 		i = -1;
 		while (++i < P_WID)
 		{
-			ray = generate_ray(pram.world->c.coord, pram.p_info, i, j);
-			trace_ray(pram.img, pram.world, ray, j * P_WID + i);
+			ray = generate_ray(param.world->c.coord, param.p_info, i, j);
+			trace_ray(param.img, param.world, ray, j * P_WID + i);
 		}
 	}
 	return (0);
@@ -1446,24 +1448,24 @@ int draw_img(t_world *world, t_vars *vars)
 	i = -1;
 	while (++i < THREAD)
 	{
-		vars->pram[i].p_info = p_info;
-		if (pthread_create(&(vars->pram[i].thread_id), NULL, drawing, vars->pram + i))
+		vars->param[i].p_info = p_info;
+		if (pthread_create(&(vars->param[i].thread_id), NULL, drawing, vars->param + i))
 			return (0);
 	}
 	i = -1;
 	while (++i < THREAD)
-		pthread_join(vars->pram[i].thread_id, &tmp);
+		pthread_join(vars->param[i].thread_id, &tmp);
 	mlx_put_image_to_window(vars->mlx, vars->win, vars->img.ptr, 0, 0);
 	return (1);
 }
 
 
-int	create_thread_pram(t_world *world, t_vars *vars, t_thread_pram **pram)
+int	create_thread_param(t_world *world, t_vars *vars, t_thread_param **param)
 {
-	t_thread_pram	*ret;
+	t_thread_param	*ret;
 	int				i;
 
-	ret = (t_thread_pram *)malloc(sizeof(t_thread_pram) * THREAD);
+	ret = (t_thread_param *)malloc(sizeof(t_thread_param) * THREAD);
 	if (ret == NULL)
 		return (0);
 	i = -1;
@@ -1473,7 +1475,7 @@ int	create_thread_pram(t_world *world, t_vars *vars, t_thread_pram **pram)
 		ret[i].world = world;
 		ret[i].index = i;
 	}
-	*pram = ret;
+	*param = ret;
 	return (1);
 }
 
@@ -1527,7 +1529,7 @@ int	main(int argc, char **argv)
 	int				fd;
 	t_world			world;
 	t_vars			vars;
-	t_thread_pram	*pram;
+	t_thread_param	*param;
 
 	if (argc != 2)
 		return (0); // call error handling function with proper error message.
@@ -1538,17 +1540,17 @@ int	main(int argc, char **argv)
 	world.pl = 0;
 	world.cy = 0;
 	world.cn = 0;
-	pram = NULL;
+	param = NULL;
 	if (read_file(fd, &world))
 	{
 		init_mlx_pointers(&vars, world);
 		printf("%s\n", "valid format");
-		if (!create_thread_pram(&world, &vars, &pram))
+		if (!create_thread_param(&world, &vars, &param))
 		{
 			//free
 			return (1);
 		}
-		vars.pram = pram;
+		vars.param = param;
 		if (!draw_img(&world, &vars))
 		{
 			//free
