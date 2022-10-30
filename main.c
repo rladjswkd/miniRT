@@ -1095,17 +1095,6 @@ t_vec	compute_specular(t_vec inter, t_vec n, t_vec v, t_light light)
 	return (ret);
 }
 
-t_vec	max_rgb(t_vec a, t_vec b)
-{
-	if (a.x < b.x)
-		a.x = b.x;
-	if (a.y < b.y)
-		a.y = b.y;
-	if (a.z < b.z)
-		a.z = b.z;
-	return (a);
-}
-
 t_vec	compute_lighting(t_vec inter, t_vec n, t_vec v, t_world world) // only for diffuse reflection, p_norm should be an unit vector
 {
 	t_vec	v_ambient;
@@ -1122,8 +1111,8 @@ t_vec	compute_lighting(t_vec inter, t_vec n, t_vec v, t_world world) // only for
 	{	
 		if (!check_shadow(world, get_l_ray(*(t_light *)l->data, inter)))
 		{
-			v_diffuse = max_rgb(v_diffuse, compute_diffuse(inter, n, *(t_light *)l->data));
-			v_specular = max_rgb(v_specular, compute_specular(inter, n, v, *(t_light *)l->data));
+			v_diffuse = vec_add(v_diffuse, compute_diffuse(inter, n, *(t_light *)l->data));
+			v_specular = vec_add(v_specular, compute_specular(inter, n, v, *(t_light *)l->data));
 		}
 		l = l->next;
 	}
