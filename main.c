@@ -1361,7 +1361,9 @@ t_uv	uv_map_plane(t_coord p, t_pl pl)
 
 	e1 = vec_cross(pl.norm, get_basis_vec(pl.norm));
 	e2 = vec_cross(pl.norm, e1);
-	return ((t_uv){vec_dot(p, e1) / P_WID, vec_dot(p, e2) / P_WID});
+	return ((t_uv){fabs(fmod(vec_dot(p, e1), 100)) / 100,
+		fabs(fmod(vec_dot(p, e2), 100)) / 100});
+	// return ((t_uv){vec_dot(p, e1) / P_WID, vec_dot(p, e2) / P_WID});
 }
 
 t_uv	uv_map_cylinder(t_coord p, t_cy cy)
@@ -1479,8 +1481,12 @@ void	get_pixel_info(t_camera c, t_p_info *p_info)
 	// h = vec_cross(c.norm, get_viewport_vec(c.norm));
 	// v = vec_cross(c.norm, h);
 	// make_viewport(c, &h, &v);
-	h = vec4_to_vec(mat_mul_vec4(rotate_latitude(c.lati), (t_vec4){0, -1, 0, 1}));
-	v = vec4_to_vec(mat_mul_vec4(rotate_longitude(c.longi), (t_vec4){1, 0, 0, 1}));
+	h = vec4_to_vec(mat_mul_vec4(mat_mul(rotate_longitude(c.longi), rotate_latitude(c.lati)), (t_vec4){0, -1, 0, 1}));
+	v = vec4_to_vec(mat_mul_vec4(mat_mul(rotate_longitude(c.longi), rotate_latitude(c.lati)), (t_vec4){1, 0, 0, 1}));
+	print_vector("", c.norm);
+	print_vector("", h);
+	print_vector("", v);
+	printf("\n");
 	h = vec_scale(h, 1.0 / vec_len(h) * (vp_w / (double)P_WID));
 	v = vec_scale(v, 1.0 / vec_len(v) * (vp_h / (double)P_HEI));
 	p_info->p_h = h;
@@ -1516,7 +1522,7 @@ t_rgb	get_obj_rgb(t_obj obj, t_coord p, t_vec lighting)
 		ret = uv_pattern_at(uv_map_sphere(p, *((t_sp *)obj.object)), 16, 8);
 	else if (obj.type == PLANE)
 		// ret = ((t_pl *)obj.object)->rgb;
-		ret = uv_pattern_at(uv_map_plane(p, *((t_pl *)obj.object)), 160, 160);
+		ret = uv_pattern_at(uv_map_plane(p, *((t_pl *)obj.object)), 16, 16);
 	else if (obj.type == CYLINDER)
 		ret = ((t_cy *)obj.object)->rgb;
 		// ret = uv_pattern_at(uv_map_cylinder(p, *((t_cy *)obj.object)), 16, 8);
@@ -1827,7 +1833,7 @@ int	main(int argc, char **argv)
 			return (1);
 		}
 		vars.obj.type = CAMERA;
-		vars.obj.object = &(world->c);// world.cy->data;
+		vars.obj.object = &(world->c);//world->pl->data; 
 		mlx_key_hook(vars.win, key_press_handler, &vars);
 		mlx_mouse_hook(vars.win, mouse_handler, &vars);
 		mlx_loop(vars.mlx);
