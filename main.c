@@ -44,6 +44,7 @@
 //#define	INFINITY	1e500
 #define	S_EXP		32 // specular exponent
 // .rt 파일에서 비어있는 줄에 공백이 들어가면 모든 내용이 올바른 형식으로 들어와도 invalid format이라고 뜨고 종료한다. 처리하고싶으면 처리하자.
+
 typedef struct s_img
 {
 	void	*ptr;
@@ -222,6 +223,9 @@ typedef struct s_vars
 	t_world		world;
 	t_thread_pram *pram;
 }	t_vars;
+
+t_mat	rotate_latitude(int);
+t_mat	rotate_longitude(int);
 
 int	check_rgb(t_rgb rgb)
 {
@@ -676,6 +680,11 @@ double	vec4_dot(t_vec4 v1, t_vec4 v2)
 	return (v1.x * v2.x + v1.y * v2.y + v1.z * v2.z + v1.w * v2.w);
 }
 
+t_vec	vec4_to_vec(t_vec4 v)
+{
+	return ((t_vec){v.x, v.y, v.z});
+}
+
 t_vec4	vec_to_vec4(t_vec v)
 {
 	return ((t_vec4){v.x, v.y, v.z, 1});
@@ -893,12 +902,12 @@ t_vec	rotate_normal(t_vec vec, t_mat op) // forward를 z축으로 변환 후 op 
 
 	rx = get_rx_to_z(vec);
 	res = mat_mul_vec4(rx, vec_to_vec4(vec));
-	ry = get_ry_to_z((t_vec){res.x, res.y, res.z});
+	ry = get_ry_to_z(vec4_to_vec(res));
 	res = mat_mul_vec4(ry, res);
 	res = mat_mul_vec4(op, res);
 	res = mat_mul_vec4(mat_transpose(ry), res);
 	res = mat_mul_vec4(mat_transpose(rx), res);
-	return ((t_vec){res.x, res.y, res.z});
+	return (vec4_to_vec(res));
 }
 
 /***************************************************************************/
@@ -1436,9 +1445,26 @@ t_vec	get_basis_vec(t_vec v)
 t_vec	get_viewport_vec(t_vec v) // move v to z axis and then x, y will be vieport vectors. 
 {
 	if (vec_len(vec_cross(v, (t_vec){0, 0, 1})) < 1e-6)
-		return (vec_normalize((t_vec){1, 0, 1})); // 1, 0, 1 (?)
+		return (vec_normalize((t_vec){1, 0, 0})); // 1, 0, 1 (?)
 	return ((t_vec){0, 0, 1});
 }
+
+// void	make_viewport(t_camera c, t_vec *h, t_vec *v)
+// {
+// 	// this method doesn't make sense.
+// 	// t_mat	rx;
+// 	// t_mat	ry;
+// 	// t_mat	inv;
+// 	// t_vec4	rotated;
+
+// 	// rx = get_rx_to_z(c.norm);
+// 	// rotated = mat_mul_vec4(rx, vec_to_vec4(c.norm));
+// 	// ry = get_ry_to_z(vec4_to_vec(rotated));
+// 	// rotated = mat_mul_vec4(ry, rotated);
+// 	// inv = mat_mul(mat_transpose(rx), mat_transpose(ry));
+// 	// *h = vec4_to_vec(mat_mul_vec4(inv, (t_vec4){0, -1, 0, 1}));
+// 	// *v = vec4_to_vec(mat_mul_vec4(inv, (t_vec4){1, 0, 0, 1}));
+// }
 
 void	get_pixel_info(t_camera c, t_p_info *p_info)
 {
@@ -1450,10 +1476,13 @@ void	get_pixel_info(t_camera c, t_p_info *p_info)
 
 	vp_w = tan((c.fov * M_PI / 180.0) / 2.0) * 2;
 	vp_h = vp_w * ((double)P_HEI / (double)P_WID);
-	h = vec_cross(c.norm, get_viewport_vec(c.norm));
-	v = vec_cross(c.norm, h);
-	h = vec_scale(h, (double)1 / vec_len(h) * (vp_w / (double)P_WID));
-	v = vec_scale(v, (double)1 / vec_len(v) * (vp_h / (double)P_HEI));
+	// h = vec_cross(c.norm, get_viewport_vec(c.norm));
+	// v = vec_cross(c.norm, h);
+	// make_viewport(c, &h, &v);
+	h = vec4_to_vec(mat_mul_vec4(rotate_latitude(c.lati), (t_vec4){0, -1, 0, 1}));
+	v = vec4_to_vec(mat_mul_vec4(rotate_longitude(c.longi), (t_vec4){1, 0, 0, 1}));
+	h = vec_scale(h, 1.0 / vec_len(h) * (vp_w / (double)P_WID));
+	v = vec_scale(v, 1.0 / vec_len(v) * (vp_h / (double)P_HEI));
 	p_info->p_h = h;
 	p_info->p_v = v;
 	tmp = vec_add(c.coord, c.norm);
@@ -1486,8 +1515,8 @@ t_rgb	get_obj_rgb(t_obj obj, t_coord p, t_vec lighting)
 		// ret = ((t_sp *)obj.object)->rgb;
 		ret = uv_pattern_at(uv_map_sphere(p, *((t_sp *)obj.object)), 16, 8);
 	else if (obj.type == PLANE)
-		ret = ((t_pl *)obj.object)->rgb;
-		// ret = uv_pattern_at(uv_map_plane(p, *((t_pl *)obj.object)), 160, 160);
+		// ret = ((t_pl *)obj.object)->rgb;
+		ret = uv_pattern_at(uv_map_plane(p, *((t_pl *)obj.object)), 160, 160);
 	else if (obj.type == CYLINDER)
 		ret = ((t_cy *)obj.object)->rgb;
 		// ret = uv_pattern_at(uv_map_cylinder(p, *((t_cy *)obj.object)), 16, 8);
