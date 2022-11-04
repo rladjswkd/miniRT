@@ -22,10 +22,12 @@
 #define UP			126
 #define RIGHT		124
 #define DOWN		125
-#define P_WID 		1280
-#define P_HEI		720
+#define WIDTH 		1280
+#define HEIGHT		720
 #define THREAD		12
 #define ANGLE		10
+
+#define	MOUSE_LEFT	1
 
 #define W			119 // linux 119,  mac 13 move up
 #define A			97  // linux 97, mac 0  move left
@@ -198,18 +200,18 @@ typedef struct s_mat
 
 t_vec	get_basis_vec(t_vec);
 
-typedef struct s_pixel_info
+typedef struct s_viewport
 {
 	t_coord	top_left;
-	t_vec	p_h;
-	t_vec	p_v;
-}	t_p_info;
+	t_vec	v_width;
+	t_vec	v_height;
+}	t_viewport;
 
 typedef struct s_thread_pram
 {
 	t_img		*img;
 	t_world		*world;
-	t_p_info	p_info;
+	t_viewport	viewport;
 	int			index;
 	pthread_t	thread_id;
 }	t_thread_pram;
@@ -244,10 +246,10 @@ int	init_mlx_pointers(t_vars *vars)
 	vars->mlx = mlx_init();
 	if (!vars->mlx)
 		return (0);
-	vars->win = mlx_new_window(vars->mlx, P_WID, P_HEI, "miniRT");
+	vars->win = mlx_new_window(vars->mlx, WIDTH, HEIGHT, "miniRT");
 	if (!vars->win)
 		return (0);
-	vars->img.ptr = mlx_new_image(vars->mlx, P_WID, P_HEI);
+	vars->img.ptr = mlx_new_image(vars->mlx, WIDTH, HEIGHT);
 	if (!vars->img.ptr)
 		return (0);
 	vars->img.addr = mlx_get_data_addr(vars->img.ptr, &vars->img.bits_per_pixel,
@@ -1363,7 +1365,7 @@ t_uv	uv_map_plane(t_coord p, t_pl pl)
 	e2 = vec_cross(pl.norm, e1);
 	return ((t_uv){fabs(fmod(vec_dot(p, e1), 100)) / 100,
 		fabs(fmod(vec_dot(p, e2), 100)) / 100});
-	// return ((t_uv){vec_dot(p, e1) / P_WID, vec_dot(p, e2) / P_WID});
+	// return ((t_uv){vec_dot(p, e1) / WIDTH, vec_dot(p, e2) / WIDTH});
 }
 
 t_uv	uv_map_cylinder(t_coord p, t_cy cy)
@@ -1428,7 +1430,7 @@ int	read_file(int fd, t_world *world)
 	return (1);
 }
 
-t_vec	get_basis_vec(t_vec v)
+t_vec	get_basis_vec(t_vec v) // replace this function's content with <rotation_to_z>_<operation>_<inverse_from_z>.
 {
 	t_vec	bx;
 	t_vec	by;
@@ -1468,41 +1470,37 @@ t_vec	get_viewport_vec(t_camera c, t_vec4 axis)
 // 	// *v = vec4_to_vec(mat_mul_vec4(inv, (t_vec4){1, 0, 0, 1}));
 // }
 
-void	get_pixel_info(t_camera c, t_p_info *p_info)
+t_viewport	generate_viewport(t_camera c)
 {
-	t_vec	h;
-	t_vec	v;
+	t_vec	v_w;
+	t_vec	v_h;
 	t_vec	top_left;
 	double	vp_h;
 	double	vp_w;
 
 	vp_w = tan((c.fov * M_PI / 180.0) / 2.0) * 2;
-	vp_h = vp_w * P_HEI / P_WID;
-	// h = vec_cross(c.norm, get_viewport_vec(c.norm));
-	// v = vec_cross(c.norm, h);
-	// make_viewport(c, &h, &v);
-	h = get_viewport_vec(c, (t_vec4){0, -1, 0, 1});
-	v = get_viewport_vec(c, (t_vec4){1, 0, 0, 1});
-	h = vec_scale(h, 1.0 / vec_len(h) * (vp_w / P_WID));
-	v = vec_scale(v, 1.0 / vec_len(v) * (vp_h / P_HEI));
+	vp_h = vp_w * HEIGHT / WIDTH;
+	// v_w = vec_cross(c.norm, get_viewport_vec(c.norm));
+	// v_h = vec_cross(c.norm, v_w);
+	// make_viewport(c, &v_w, &v_h);
+	v_w = vec_scale(get_viewport_vec(c, (t_vec4){0, -1, 0, 1}), vp_w / WIDTH);
+	v_h = vec_scale(get_viewport_vec(c, (t_vec4){1, 0, 0, 1}), vp_h / HEIGHT);
 	top_left = vec_add(c.coord, c.norm);
-	top_left = vec_sub(top_left, vec_scale(h, P_WID / 2.0));
-	top_left = vec_sub(top_left, vec_scale(v, P_HEI / 2.0));
-	p_info->p_h = h;
-	p_info->p_v = v;
-	p_info->top_left = top_left;
+	top_left = vec_sub(top_left, vec_scale(v_w, WIDTH / 2.0));
+	top_left = vec_sub(top_left, vec_scale(v_h, HEIGHT / 2.0));
+	return ((t_viewport){top_left, v_w, v_h});
 }
 
 /////////////////////////////////////////////////////
-t_ray	generate_ray(t_coord pos, t_p_info p_info, int i, int j)
+t_ray	generate_ray(t_coord pos, t_viewport viewport, int i, int j)
 {
 	t_ray	ret;
 	t_coord	tmp;
 
 	ret.pos = pos;
-	tmp = p_info.top_left;
-	tmp = vec_add(tmp, vec_scale(p_info.p_h, i));
-	tmp = vec_add(tmp, vec_scale(p_info.p_v, j));
+	tmp = viewport.top_left;
+	tmp = vec_add(tmp, vec_scale(viewport.v_width, i));
+	tmp = vec_add(tmp, vec_scale(viewport.v_height, j));
 	ret.dir = vec_sub(tmp, pos);
 	return (ret);
 }
@@ -1652,14 +1650,14 @@ void	*drawing(void *b_pram)
 	int				j;
 
 	pram = *(t_thread_pram *)b_pram;
-	j = pram.index * (P_HEI / THREAD) - 1;
-	while (++j < (pram.index + 1) * (P_HEI / THREAD))
+	j = pram.index * (HEIGHT / THREAD) - 1;
+	while (++j < (pram.index + 1) * (HEIGHT / THREAD))
 	{
 		i = -1;
-		while (++i < P_WID)
+		while (++i < WIDTH)
 		{
-			ray = generate_ray(pram.world->c.coord, pram.p_info, i, j);
-			trace_ray(pram.img, pram.world, ray, j * P_WID + i);
+			ray = generate_ray(pram.world->c.coord, pram.viewport, i, j);
+			trace_ray(pram.img, pram.world, ray, j * WIDTH + i);
 		}
 	}
 	return (0);
@@ -1667,7 +1665,7 @@ void	*drawing(void *b_pram)
 
 int draw_img(t_vars *vars)
 {
-	t_p_info	p_info;
+	t_viewport	viewport;
 	void		*tmp;
 	int			i;
 /////////////////////// key_press_handler doesn't change world's value.
@@ -1675,11 +1673,11 @@ int draw_img(t_vars *vars)
 	// print_vector("normal: ", c.norm);
 	// print_vector("coordinate: ", c.coord);
 ///////////////////////
-	get_pixel_info(vars->world.c, &p_info);
+	viewport = generate_viewport(vars->world.c);
 	i = -1;
 	while (++i < THREAD)
 	{
-		vars->pram[i].p_info = p_info;
+		vars->pram[i].viewport = viewport;
 		if (pthread_create(&(vars->pram[i].thread_id), NULL, drawing, vars->pram + i))
 			return (0);
 	}
@@ -1789,9 +1787,15 @@ int	key_press_handler(int code, t_vars *vars)
 
 int	mouse_handler(int button, int x, int y, t_vars *vars)
 {
-	(void)vars;
-	(void)button;
-	printf("%d, %d\n", x, y);
+	t_ray		ray;
+	t_camera	c;
+
+	if (MOUSE_LEFT != button)
+		return (0);
+	c = vars->world.c;
+	ray = generate_ray(c.coord, generate_viewport(c), x, y);
+	if (!intersect(ray, vars->world, &(vars->obj)))
+		return (0);
 	return (0);
 }
 
