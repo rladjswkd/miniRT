@@ -25,7 +25,7 @@
 #define P_WID 		1280
 #define P_HEI		720
 #define THREAD		12
-#define ANGLE		30
+#define ANGLE		10
 
 #define W			119 // linux 119,  mac 13 move up
 #define A			97  // linux 97, mac 0  move left
@@ -235,7 +235,7 @@ int	check_rgb(t_rgb rgb)
 	return (-1 < r && r < 256 && -1 < g && g < 256 && -1 < b && b < 256);
 }
 
-int	init_mlx_pointers(t_vars *vars, t_world world)
+int	init_mlx_pointers(t_vars *vars)
 {
 	vars->mlx = mlx_init();
 	if (!vars->mlx)
@@ -253,7 +253,6 @@ int	init_mlx_pointers(t_vars *vars, t_world world)
 	vars->obj.type = NONE;
 	vars->obj.object = 0;
 	vars->obj.t = 0;
-	vars->world = world;
 	return (1);
 }
 
@@ -1434,10 +1433,10 @@ t_vec	get_basis_vec(t_vec v)
 	return (by);
 }
 
-t_vec	get_viewport_vec(t_vec v)
+t_vec	get_viewport_vec(t_vec v) // move v to z axis and then x, y will be vieport vectors. 
 {
 	if (vec_len(vec_cross(v, (t_vec){0, 0, 1})) < 1e-6)
-		return (vec_normalize((t_vec){1, 0, 1}));
+		return (vec_normalize((t_vec){1, 0, 1})); // 1, 0, 1 (?)
 	return ((t_vec){0, 0, 1});
 }
 
@@ -1635,13 +1634,17 @@ void	*drawing(void *b_pram)
 	return (0);
 }
 
-int draw_img(t_world *world, t_vars *vars)
+int draw_img(t_vars *vars)
 {
 	t_p_info	p_info;
 	void		*tmp;
 	int			i;
-
-	get_pixel_info(world->c, &p_info);
+/////////////////////// key_press_handler doesn't change world's value.
+	// t_camera c = world->c;
+	// print_vector("normal: ", c.norm);
+	// print_vector("coordinate: ", c.coord);
+///////////////////////
+	get_pixel_info(vars->world.c, &p_info);
 	i = -1;
 	while (++i < THREAD)
 	{
@@ -1657,7 +1660,7 @@ int draw_img(t_world *world, t_vars *vars)
 }
 
 
-int	create_thread_pram(t_world *world, t_vars *vars, t_thread_pram **pram)
+int	create_thread_pram(t_vars *vars, t_thread_pram **pram)
 {
 	t_thread_pram	*ret;
 	int				i;
@@ -1669,7 +1672,7 @@ int	create_thread_pram(t_world *world, t_vars *vars, t_thread_pram **pram)
 	while (++i < THREAD)
 	{
 		ret[i].img = &vars->img;
-		ret[i].world = world;
+		ret[i].world = &(vars->world);
 		ret[i].index = i;
 	}
 	*pram = ret;
@@ -1749,22 +1752,23 @@ int	key_press_handler(int code, t_vars *vars)
 	else if (code == W || code == A || code == S || code == D
 		|| code == Q || code == E)
 		translate_object(vars->obj, code);
-	draw_img(&(vars->world), vars);
+	draw_img(vars);
 	return (0);
 }
 
-int	mouse_handler(int code, t_vars *vars)
+int	mouse_handler(int button, int x, int y, t_vars *vars)
 {
 	(void)vars;
-	printf("%d\n", code);
+	(void)button;
+	printf("%d, %d\n", x, y);
 	return (0);
 }
 
 int	main(int argc, char **argv)
 {
 	int				fd;
-	t_world			world;
 	t_vars			vars;
+	t_world			*world;
 	t_thread_pram	*pram;
 
 	if (argc != 2)
@@ -1772,37 +1776,38 @@ int	main(int argc, char **argv)
 	fd = open_file(argv[1]);
 	if (fd < 0) // remove this when error handling function is completed.
 		return (0); // 에러 문자열 출력하고 처리해주기
-	world.sp = 0;
-	world.pl = 0;
-	world.cy = 0;
-	world.cn = 0;
+	world = &(vars.world);
+	world->sp = 0;
+	world->pl = 0;
+	world->cy = 0;
+	world->cn = 0;
 	pram = NULL;
-	if (read_file(fd, &world))
+	if (read_file(fd, world))
 	{
-		init_mlx_pointers(&vars, world);
+		init_mlx_pointers(&vars);
 		printf("%s\n", "valid format");
-		if (!create_thread_pram(&world, &vars, &pram))
+		if (!create_thread_pram(&vars, &pram))
 		{
 			//free
 			return (1);
 		}
 		vars.pram = pram;
-		if (!draw_img(&world, &vars))
+		if (!draw_img(&vars))
 		{
 			//free
 			return (1);
 		}
-		vars.obj.type = CYLINDER;
-		vars.obj.object = world.cy->data;
+		vars.obj.type = CAMERA;
+		vars.obj.object = &(world->c);// world.cy->data;
 		mlx_key_hook(vars.win, key_press_handler, &vars);
 		mlx_mouse_hook(vars.win, mouse_handler, &vars);
 		mlx_loop(vars.mlx);
 	}
 	else
 		printf("%s\n", "invalid format");
-	clear_list(&(world.sp));
-	clear_list(&(world.pl));
-	clear_list(&(world.cy));
-	clear_list(&(world.cn));
+	clear_list(&(world->sp));
+	clear_list(&(world->pl));
+	clear_list(&(world->cy));
+	clear_list(&(world->cn));
 	return (0);
 }
