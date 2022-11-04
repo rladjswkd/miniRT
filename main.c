@@ -1444,11 +1444,11 @@ t_vec	get_basis_vec(t_vec v)
 	return (by);
 }
 
-t_vec	get_viewport_vec(t_vec v) // move v to z axis and then x, y will be vieport vectors. 
+t_vec	get_viewport_vec(t_camera c, t_vec4 axis)
 {
-	if (vec_len(vec_cross(v, (t_vec){0, 0, 1})) < 1e-6)
-		return (vec_normalize((t_vec){1, 0, 0})); // 1, 0, 1 (?)
-	return ((t_vec){0, 0, 1});
+	return (vec4_to_vec(mat_mul_vec4(
+		mat_mul(rotate_longitude(c.longi), rotate_latitude(c.lati)),
+		axis)));
 }
 
 // void	make_viewport(t_camera c, t_vec *h, t_vec *v)
@@ -1472,29 +1472,25 @@ void	get_pixel_info(t_camera c, t_p_info *p_info)
 {
 	t_vec	h;
 	t_vec	v;
-	t_vec	tmp;
+	t_vec	top_left;
 	double	vp_h;
 	double	vp_w;
 
 	vp_w = tan((c.fov * M_PI / 180.0) / 2.0) * 2;
-	vp_h = vp_w * ((double)P_HEI / (double)P_WID);
+	vp_h = vp_w * P_HEI / P_WID;
 	// h = vec_cross(c.norm, get_viewport_vec(c.norm));
 	// v = vec_cross(c.norm, h);
 	// make_viewport(c, &h, &v);
-	h = vec4_to_vec(mat_mul_vec4(mat_mul(rotate_longitude(c.longi), rotate_latitude(c.lati)), (t_vec4){0, -1, 0, 1}));
-	v = vec4_to_vec(mat_mul_vec4(mat_mul(rotate_longitude(c.longi), rotate_latitude(c.lati)), (t_vec4){1, 0, 0, 1}));
-	print_vector("", c.norm);
-	print_vector("", h);
-	print_vector("", v);
-	printf("\n");
-	h = vec_scale(h, 1.0 / vec_len(h) * (vp_w / (double)P_WID));
-	v = vec_scale(v, 1.0 / vec_len(v) * (vp_h / (double)P_HEI));
+	h = get_viewport_vec(c, (t_vec4){0, -1, 0, 1});
+	v = get_viewport_vec(c, (t_vec4){1, 0, 0, 1});
+	h = vec_scale(h, 1.0 / vec_len(h) * (vp_w / P_WID));
+	v = vec_scale(v, 1.0 / vec_len(v) * (vp_h / P_HEI));
+	top_left = vec_add(c.coord, c.norm);
+	top_left = vec_sub(top_left, vec_scale(h, P_WID / 2.0));
+	top_left = vec_sub(top_left, vec_scale(v, P_HEI / 2.0));
 	p_info->p_h = h;
 	p_info->p_v = v;
-	tmp = vec_add(c.coord, c.norm);
-	tmp = vec_sub(tmp, vec_scale(h, (double)P_WID / (double)2));
-	tmp = vec_sub(tmp, vec_scale(v, (double)P_HEI / (double)2));
-	p_info->top_left = tmp;
+	p_info->top_left = top_left;
 }
 
 /////////////////////////////////////////////////////
