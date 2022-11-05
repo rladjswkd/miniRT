@@ -20,7 +20,7 @@ all : $(NAME)
 
 $(NAME) : $(OBJS)
 	@make -C mlx 2> /dev/null
-	$(CC) $(OBJS) -Lmlx -lmlx -framework OpenGL -framework AppKit -o $(NAME)
+	$(CC) $(OBJS) -Lmlx -lmlx -lz -framework OpenGL -framework AppKit -o $(NAME)
 
 clean :
 	@make clean -C mlx
