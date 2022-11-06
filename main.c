@@ -1143,7 +1143,7 @@ t_uv	uv_map_cylinder(t_coord p, t_cy cy)
 	e2 = vec_cross(cy.norm, e1);
 	c_p = vec_sub(p, cy.coord);
 	uv.u = 0.5 + atan2(vec_dot(c_p, e1), vec_dot(c_p, e2)) / (2 * M_PI);
-	uv.v = vec_len(vec_proj(vec_sub(p, cy.coord), cy.norm)) / cy.height;
+	uv.v = vec_len(vec_proj(vec_sub(p, cy.coord), cy.norm)) / (cy.height + 1);
 	n_p = vec_normalize(vec_sub(p, vec_add(cy.coord, vec_proj(c_p, cy.norm))));
 	if (vec_dot(c_p, cy.norm))
 		n_p = cy.norm;
