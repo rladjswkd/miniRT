@@ -232,7 +232,7 @@ typedef struct s_thread_param
 {
 	t_vars		*vars;
 	t_world		*world;
-	t_p_info	p_info;
+	t_viewport	viewport;
 	int			index;
 	pthread_t	thread_id;
 }	t_thread_param;
@@ -1405,13 +1405,6 @@ t_vec	compute_lighting(t_vec inter, t_vec n, t_vec v, t_world world) // only for
 	return (lighting);
 }
 
-t_vec	get_viewport_vec(t_vec v)
-{
-	if (vec_len(vec_cross(v, (t_vec){0, 0, 1})) < 1e-6)
-		return ((t_vec){1, 0, 0});
-	return ((t_vec){0, 0, 1});
-}
-
 typedef struct s_uv
 {
 	double	u;
@@ -1430,7 +1423,7 @@ t_uv	uv_map_sphere(t_coord p, t_sp sp)
 	vec = vec_normalize(vec_sub(p, sp.coord));
 	uv.u = 0.5 + atan2(vec.x, vec.y) / (2 * M_PI);
 	uv.v = 0.5 - asin(vec.z) / M_PI;
-	uv.pu = vec_normalize(vec_cross(vec, get_viewport_vec(vec)));
+	uv.pu = vec_normalize(vec_cross(vec, get_basis_vec(vec)));
 	uv.pv = vec_normalize(vec_cross(vec, uv.pu));
 	return (uv);
 }
@@ -1464,7 +1457,7 @@ t_uv	uv_map_cylinder(t_coord p, t_cy cy)
 	n_p = vec_normalize(vec_sub(p, vec_add(cy.coord, vec_proj(c_p, cy.norm))));
 	if (vec_dot(c_p, cy.norm))
 		n_p = cy.norm;
-	uv.pu = vec_normalize(vec_cross(n_p, get_viewport_vec(n_p)));
+	uv.pu = vec_normalize(vec_cross(n_p, get_basis_vec(n_p)));
 	uv.pv = vec_normalize(vec_cross(n_p, uv.pu));
 	return (uv);
 }
@@ -1488,7 +1481,7 @@ t_uv	uv_map_cone(t_coord p, t_cn cn)
 
 	ret = uv_map_cylinder(p, (t_cy)cn);
 	n_p = get_cone_body_norm(p, cn);
-	ret.pu = vec_normalize(vec_cross(n_p, get_viewport_vec(n_p)));
+	ret.pu = vec_normalize(vec_cross(n_p, get_basis_vec(n_p)));
 	ret.pv = vec_normalize(vec_cross(n_p, ret.pu));
 	return (ret);
 }
@@ -1727,20 +1720,6 @@ t_rgb	get_obj_rgb(t_vars *vars, t_obj obj, t_coord p, t_vec lighting)
 		get_cy_rgb, get_pl_rgb, get_cn_rgb};
 
 	ret = (*fp[obj.type - 1])(vars->b_img, obj.object, p);
-	(void)p; //
-	ret = (t_rgb){0, 0, 0};
-	if (obj.type == SPHERE)
-		// ret = ((t_sp *)obj.object)->rgb;
-		ret = uv_pattern_at(uv_map_sphere(p, *((t_sp *)obj.object)), 16, 8);
-	else if (obj.type == PLANE)
-		// ret = ((t_pl *)obj.object)->rgb;
-		ret = uv_pattern_at(uv_map_plane(p, *((t_pl *)obj.object)), 16, 16);
-	else if (obj.type == CYLINDER)
-		ret = ((t_cy *)obj.object)->rgb;
-		// ret = uv_pattern_at(uv_map_cylinder(p, *((t_cy *)obj.object)), 16, 8);
-	else if (obj.type == CONE)
-		ret = ((t_cn *)obj.object)->rgb;
-		// ret = uv_pattern_at(uv_map_cone(p, *((t_cn *)obj.object)), 16, 8);
 	return (mult_rgb_vec(ret, lighting));
 }
 
@@ -1902,32 +1881,6 @@ int	trace_ray(t_vars *vars, t_world *world, t_ray ray, int i)
 }
 /////////////////////////////////////////////////////
 
-
-t_vec	vec_translate(t_vec v, double dx, double dy, double dz)
-{
-	return ((t_vec){v.x + dx, v.y + dy, v.z + dz});
-}
-
-t_vec	vec_rotate_v(t_vec forward)
-{
-	t_vec	up;
-	t_vec	right;
-
-	right = vec_normalize(vec_cross(forward, get_viewport_vec(forward)));
-	up = vec_normalize(vec_cross(right, forward));
-	return (vec_add(vec_scale(forward, cos(R_RAD)), vec_scale(up, sin(R_RAD))));
-}
-
-// forward and right are on a plane and up is it's forward.
-// forward length is always 1.
-t_vec	vec_rotate_h(t_vec forward)
-{
-	t_vec	right;
-
-	right = vec_normalize(vec_cross(forward, get_viewport_vec(forward)));
-	return (vec_add(vec_scale(forward, cos(R_RAD)), vec_scale(right, sin(R_RAD))));
-}
-
 void	*drawing(void *b_param)
 {
 	t_thread_param	param;
@@ -1936,23 +1889,23 @@ void	*drawing(void *b_param)
 	int				j;
 
 	param = *(t_thread_param *)b_param;
-	j = param.index * (P_HEI / THREAD) - 1;
-	while (++j < (param.index + 1) * (P_HEI / THREAD))
+	j = param.index * (HEIGHT / THREAD) - 1;
+	while (++j < (param.index + 1) * (HEIGHT / THREAD))
 	{
 		i = -1;
 		while (++i < WIDTH)
 		{
-			ray = generate_ray(param.world->c.coord, param.p_info, i, j);
-			trace_ray(param.vars, param.world, ray, j * P_WID + i);
+			ray = generate_ray(param.world->c.coord, param.viewport, i, j);
+			trace_ray(param.vars, param.world, ray, j * WIDTH + i);
 		}
 	}
 	return (0);
 }
 
-int draw_img(t_thread_pram *param)
+int draw_img(t_thread_param *param)
 {
 	t_viewport	viewport;
-  t_vars		*vars;
+  	t_vars		*vars;
 	void		*tmp;
 	int			i;
 /////////////////////// key_press_handler doesn't change world's value.
@@ -1961,11 +1914,11 @@ int draw_img(t_thread_pram *param)
 	// print_vector("coordinate: ", c.coord);
 ///////////////////////
 	vars = param->vars;
-	viewport = generate_viewport(vars->world.c);
+	viewport = generate_viewport(param->world->c);
 	i = -1;
 	while (++i < THREAD)
 	{
-		param[i].p_info = p_info;
+		param[i].viewport = viewport;
 		if (pthread_create(&(param[i].thread_id), NULL, drawing, param + i))
 			return (0);
 	}
@@ -2061,7 +2014,11 @@ void	rotate_object(t_obj obj, int keycode)
 	t_obj_info	*current_object;
 	int			latitude;
 	int			longitude;
+	int			type;
 
+	type = obj.type;
+	if (type == LIGHT || type == SPHERE)
+		return ;
 	current_object = (t_obj_info *)(obj.object);
 	latitude = current_object->lati;
 	longitude = current_object->longi;
@@ -2102,7 +2059,7 @@ void	translate_object(t_obj obj, int keycode)
 	current_object->coord = translated;
 }
 
-int	key_press_handler(int code, t_thread_pram *param)
+int	key_press_handler(int code, t_thread_param *param)
 {
 	t_vars	*vars;
 
@@ -2118,28 +2075,28 @@ int	key_press_handler(int code, t_thread_pram *param)
 		translate_object(vars->obj, code);
 	else if (code == K) {
 		vars->obj.type = CAMERA;
-		vars->obj.object = &(vars->world.c);
+		vars->obj.object = &(param->world->c);
 	}
-  else if (code == C)
+	else if (code == C)
 		apply_checker(vars->obj);
 	else if (code == B)
 		apply_bump(vars->obj);
 	else if (code == I)
 		apply_img(vars->obj);
-	draw_img(vars);
+	draw_img(param);
 	return (0);
 }
 
-int	mouse_handler(int button, int x, int y, t_vars *vars)
+int	mouse_handler(int button, int x, int y, t_thread_param *param)
 {
 	t_ray		ray;
 	t_camera	c;
 
 	if (MOUSE_LEFT != button)
 		return (0);
-	c = vars->world.c;
+	c = param->world->c;
 	ray = generate_ray(c.coord, generate_viewport(c), x, y);
-	if (!intersect(ray, vars->world, &(vars->obj)))
+	if (!intersect(ray, *(param->world), &(param->vars->obj)))
 		return (0);
 	return (0);
 }
@@ -2148,7 +2105,7 @@ int	main(int argc, char **argv)
 {
 	int				fd;
 	t_vars			vars;
-	t_world			*world;
+	t_world			world;
 	t_thread_param	*param;
 
 	if (argc != 2)
@@ -2156,12 +2113,12 @@ int	main(int argc, char **argv)
 	fd = open_file(argv[1]);
 	if (fd < 0) // remove this when error handling function is completed.
 		return (0); // 에러 문자열 출력하고 처리해주기
-	world = &(vars.world);
-	world->sp = 0;
-	world->pl = 0;
-	world->cy = 0;
-	world->cn = 0;
-	if (read_file(fd, world))
+	world.l = 0;
+	world.sp = 0;
+	world.pl = 0;
+	world.cy = 0;
+	world.cn = 0;
+	if (read_file(fd, &world))
 	{
 		init_mlx_pointers(&vars);
 		printf("%s\n", "valid format");
@@ -2176,16 +2133,18 @@ int	main(int argc, char **argv)
 			return (1);
 		}
 		vars.obj.type = CAMERA;
-		vars.obj.object = &(world->c);//world->pl->data; 
+		vars.obj.object = &(world.c);//world.pl->data; 
 		mlx_key_hook(vars.win, key_press_handler, param);
 		mlx_mouse_hook(vars.win, mouse_handler, param);
 		mlx_loop(vars.mlx);
 	}
 	else
 		printf("%s\n", "invalid format");
-	clear_list(&(world->sp));
-	clear_list(&(world->pl));
-	clear_list(&(world->cy));
-	clear_list(&(world->cn));
+	clear_list(&(world.l));
+	clear_list(&(world.sp));
+	clear_list(&(world.pl));
+	clear_list(&(world.cy));
+	clear_list(&(world.cn));
+	// free(param);
 	return (0);
 }
