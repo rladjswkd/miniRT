@@ -54,8 +54,8 @@
 #define I			34 // linux
 
 #define K			40 // linux , mac 40 select camera
-#define Z			6  // linux 122, mac 6  move forward
-#define X			7  // linux 120, mac 7  move back
+// #define Z			6  // linux 122, mac 6  move forward
+// #define X			7  // linux 120, mac 7  move back
 //#define	INFINITY	1e500
 #define	S_EXP		32 // specular exponent
 // .rt 파일에서 비어있는 줄에 공백이 들어가면 모든 내용이 올바른 형식으로 들어와도 invalid format이라고 뜨고 종료한다. 처리하고싶으면 처리하자.
@@ -1242,7 +1242,7 @@ void	check_cn(t_ray ray, t_node *cn, t_obj *obj)
 
 int	intersect(t_ray ray, t_world world, t_obj *obj)
 {
-	obj->type = 0;
+	obj->type = NONE;
 	obj->t = INFINITY;
 	check_sp(ray, world.sp, obj);
 	check_cy(ray, world.cy, obj);
@@ -1980,7 +1980,11 @@ int	*get_p_status(int type, void *object)
 void	apply_checker(t_obj obj)
 {
 	int	*status;
+	int	type;
 
+	type = obj.type;
+	if (type == NONE || type == CAMERA || type == LIGHT)
+		return ;
 	status = get_p_status(obj.type, obj.object);
 	if (*status & CHECKER)
 		*status -= CHECKER;
@@ -1991,7 +1995,11 @@ void	apply_checker(t_obj obj)
 void	apply_bump(t_obj obj)
 {
 	int	*status;
+	int	type;
 
+	type = obj.type;
+	if (type == NONE || type == CAMERA || type == LIGHT)
+		return ;
 	status = get_p_status(obj.type, obj.object);
 	if (*status & BUMP)
 		*status -= BUMP;
@@ -2002,7 +2010,11 @@ void	apply_bump(t_obj obj)
 void	apply_img(t_obj obj)
 {
 	int	*status;
+	int	type;
 
+	type = obj.type;
+	if (type == NONE || type == CAMERA || type == LIGHT)
+		return ;
 	status = get_p_status(obj.type, obj.object);
 	if (*status & IMAGE)
 		*status -= IMAGE;
@@ -2028,7 +2040,7 @@ void	rotate_object(t_thread_param *param, int keycode)
 
 	obj = param->vars->obj;
 	type = obj.type;
-	if (type == LIGHT || type == SPHERE)
+	if (type == NONE || type == LIGHT || type == SPHERE)
 		return ;
 	current_object = (t_obj_info *)(obj.object);
 	latitude = current_object->lati;
@@ -2050,13 +2062,15 @@ void	translate_object(t_thread_param *param, int keycode)
 	t_camera	camera;
 	t_vec		d_vec;
 
+	if (param->vars->obj.type == NONE)
+		return ;
 	current_object = (t_obj_info *)(param->vars->obj.object);
 	camera = param->world->c;
 	d_vec = vec_add(
 		vec_add(
-			vec_scale(get_viewport_vec(camera, (t_vec4){-1, 0, 0, 1}), (keycode == E) - (keycode == Q)),
-			vec_scale(get_viewport_vec(camera, (t_vec4){0, -1, 0, 1}), (keycode == D) - (keycode == A))),
-		vec_scale(camera.norm, (keycode == W) - (keycode == S)));
+			vec_scale(get_viewport_vec(camera, (t_vec4){-1, 0, 0, 1}), 10 * ((keycode == E) - (keycode == Q))),
+			vec_scale(get_viewport_vec(camera, (t_vec4){0, -1, 0, 1}), 10 * ((keycode == D) - (keycode == A)))),
+		vec_scale(camera.norm, 10 * ((keycode == W) - (keycode == S))));
 	current_object->coord = vec_add(current_object->coord, d_vec);
 }
 
@@ -2067,8 +2081,6 @@ int	key_press_handler(int code, t_thread_param *param)
 	// (void)vars;
 	// printf("%d\n", code);
 	vars = param->vars;
-	if (vars->obj.type == NONE)
-		return (0);
 	if (code == ONE || code == TWO || code == THREE || code == FOUR)
 		rotate_object(param, code);
 	else if (code == W || code == A || code == S || code == D
@@ -2097,8 +2109,7 @@ int	mouse_handler(int button, int x, int y, t_thread_param *param)
 		return (0);
 	c = param->world->c;
 	ray = generate_ray(c.coord, generate_viewport(c), x, y);
-	if (!intersect(ray, *(param->world), &(param->vars->obj)))
-		return (0);
+	intersect(ray, *(param->world), &(param->vars->obj));
 	return (0);
 }
 
