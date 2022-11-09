@@ -128,7 +128,7 @@ typedef struct s_world
 {
 	t_ambient	a;
 	t_camera	c;
-	t_light		l;
+	t_node		*l;
 	t_node		*sp;
 	t_node		*cy;
 	t_node		*pl;
@@ -312,6 +312,13 @@ int	set_ambient(char **info, int cnt, t_world *world)
 	return (1);
 }
 
+t_node	*get_last_node(t_node *list) // this function is called after malloc, so list is non-null.
+{
+	while (list->next)
+		list = list->next;
+	return (list);
+}
+
 int	set_light(char **info, int cnt, t_world *world)
 {
 	double	intensitiy;
@@ -319,7 +326,7 @@ int	set_light(char **info, int cnt, t_world *world)
 
 	if (cnt != 4)
 		return (0);
-	l = &(world->l);
+	l = (t_light *)(get_last_node(world->l)->data);
 	if (!set_coordinate(info[1], &(l->coord)))
 		return (0);
 	if (!get_double(info[2], &intensitiy) || intensitiy < 0 || 1 < intensitiy)
@@ -347,13 +354,6 @@ int	set_camera(char **info, int cnt, t_world *world)
 		return (0);
 	c->fov = fov;
 	return (1);
-}
-
-t_node	*get_last_node(t_node *list) // this function is called after malloc, so list is non-null.
-{
-	while (list->next)
-		list = list->next;
-	return (list);
 }
 
 int	set_plane(char **info, int cnt, t_world *world)
@@ -441,6 +441,17 @@ int	set_cone(char **info, int cnt, t_world *world)
 	return (1);
 }
 
+int	alloc_light(void **ptr)
+{
+	t_light	*l;
+
+	l = (t_light *)malloc(sizeof(t_light));
+	if (!l)
+		return (0);
+	*ptr = (void *)l;
+	return (1);
+}
+
 int	alloc_sphere(void **ptr){
 	t_sp	*sp;
 	
@@ -484,14 +495,14 @@ int	alloc_cone(void **ptr)
 
 int	alloc_new_node(t_node **node, int index)
 {
-	static int	(*allocator[4])(void **)
-		= {alloc_sphere, alloc_plane, alloc_cylinder, alloc_cone};
+	static int	(*allocator[5])(void **)
+		= {alloc_light, alloc_sphere, alloc_plane, alloc_cylinder, alloc_cone};
 
 	*node = (t_node *)malloc(sizeof(t_node));
 	if (!(*node))
 		return (0);
 	(*node)->next = 0;
-	if (!(*allocator[index - 3])(&((*node)->data)))
+	if (!(*allocator[index - 2])(&((*node)->data)))
 	{
 		free(*node);
 		return (0);
@@ -532,8 +543,10 @@ int	set_object_list(t_world *rt, int index)
 
 	if (!alloc_new_node(&new_node, index))
 		return (0);
-	objects = &(rt->sp);
-	if (index == 4)
+	objects = &(rt->l);
+	if (index == 3)
+		objects = &(rt->sp);
+	else if (index == 4)
 		objects = &(rt->pl);
 	else if (index == 5)
 		objects = &(rt->cy);
@@ -562,10 +575,10 @@ int	set_world(char *line, t_world *rt, int *mask)
 	index = check_identifier(splitted[0]);
 	if (index == -1)
 		return (free_splitted(splitted, 0)); // caller must print error if set_world returns 0.
-	if (index < 3 && (*mask & 1 << index || !(*fp[index])(splitted, cnt, rt))) // A, C, L shouldn't be on mutiple lines and don't need malloc.
+	if (index < 2 && (*mask & 1 << index || !(*fp[index])(splitted, cnt, rt))) // A, C, L shouldn't be on mutiple lines and don't need malloc.
 		return (free_splitted(splitted, 0));
 	*mask |= 1 << index;
-	if (2 < index
+	if (1 < index
 		&& (!set_object_list(rt, index)	|| !(*fp[index])(splitted, cnt, rt)))
 		return (free_splitted(splitted, 0));
 	return (free_splitted(splitted, 1));
@@ -1051,21 +1064,21 @@ t_rgb	mult_rgb_vec(t_rgb rgb, t_vec vec)
 		(int)(vec.y * rgb.g), (int)(vec.z * rgb.b)});
 }
 
-t_vec	compute_diffuse(t_vec inter, t_vec n, t_world world)
+t_vec	compute_diffuse(t_vec inter, t_vec n, t_light light)
 {
 	t_vec	ret;
 	t_vec	l;
 	double	n_dot_l;
 
 	ret = (t_vec){0, 0, 0};
-	l = vec_normalize(vec_sub(world.l.coord, inter));
+	l = vec_normalize(vec_sub(light.coord, inter));
 	n_dot_l = vec_dot(n, l);
 	if (n_dot_l > 0)
-		ret = vec_scale(rgb_to_vec(world.l.rgb), world.l.intensity * n_dot_l);
+		ret = vec_scale(rgb_to_vec(light.rgb), light.intensity * n_dot_l);
 	return (ret);
 }
 
-t_vec	compute_specular(t_vec inter, t_vec n, t_vec v, t_world world)
+t_vec	compute_specular(t_vec inter, t_vec n, t_vec v, t_light light)
 {
 	t_vec	ret;
 	t_vec	l;
@@ -1073,13 +1086,13 @@ t_vec	compute_specular(t_vec inter, t_vec n, t_vec v, t_world world)
 	double	r_dot_v;
 
 	ret = (t_vec){0, 0, 0};
-	l = vec_normalize(vec_sub(world.l.coord, inter));
+	l = vec_normalize(vec_sub(light.coord, inter));
 	r = vec_sub(vec_neg(l), vec_scale(n, 2.0 * vec_dot(n, vec_neg(l))));
 	r_dot_v = vec_dot(v, r);
 	if (r_dot_v > 0)
-		ret = vec_scale(rgb_to_vec(world.l.rgb),
-			world.l.intensity * pow(r_dot_v, S_EXP));
-    return (ret);
+		ret = vec_scale(rgb_to_vec(light.rgb), \
+			light.intensity * pow(r_dot_v, S_EXP));
+	return (ret);
 }
 
 t_vec	compute_lighting(t_vec inter, t_vec n, t_vec v, t_world world) // only for diffuse reflection, p_norm should be an unit vector
@@ -1088,15 +1101,22 @@ t_vec	compute_lighting(t_vec inter, t_vec n, t_vec v, t_world world) // only for
 	t_vec	v_diffuse;
 	t_vec	v_specular;
 	t_vec	lighting;
-	v_ambient = vec_scale(rgb_to_vec(world.l.rgb), world.a.intensity);
-	if (check_shadow(world, get_l_ray(world.l, inter)))
-		lighting = v_ambient;
-	else
-	{
-		v_diffuse = compute_diffuse(inter, n , world);
-		v_specular = compute_specular(inter, n, v, world);
-		lighting = vec_add(vec_add(v_ambient, v_diffuse), v_specular);
+	t_node	*l;
+
+	l = world.l;
+	v_ambient = vec_scale(rgb_to_vec(world.a.rgb), world.a.intensity);
+	v_diffuse = (t_vec){0, 0, 0};
+	v_specular = (t_vec){0, 0, 0};
+	while (l)
+	{	
+		if (!check_shadow(world, get_l_ray(*(t_light *)l->data, inter)))
+		{
+			v_diffuse = vec_add(v_diffuse, compute_diffuse(inter, n, *(t_light *)l->data));
+			v_specular = vec_add(v_specular, compute_specular(inter, n, v, *(t_light *)l->data));
+		}
+		l = l->next;
 	}
+	lighting = vec_add(vec_add(v_ambient, v_diffuse), v_specular);
 	lighting.x -= (lighting.x > 1.0) * (lighting.x - 1.0);
 	lighting.y -= (lighting.y > 1.0) * (lighting.y - 1.0);
 	lighting.z -= (lighting.z > 1.0) * (lighting.z - 1.0);
@@ -1534,6 +1554,7 @@ int	main(int argc, char **argv)
 	fd = open_file(argv[1]);
 	if (fd < 0) // remove this when error handling function is completed.
 		return (0); // 에러 문자열 출력하고 처리해주기
+	world.l = 0;
 	world.sp = 0;
 	world.pl = 0;
 	world.cy = 0;
@@ -1561,6 +1582,7 @@ int	main(int argc, char **argv)
 	}
 	else
 		printf("%s\n", "invalid format");
+	clear_list(&(world.l));
 	clear_list(&(world.sp));
 	clear_list(&(world.pl));
 	clear_list(&(world.cy));
