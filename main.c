@@ -153,7 +153,7 @@ typedef struct s_world
 {
 	t_ambient	a;
 	t_camera	c;
-	t_light		l;
+	t_node		*l;
 	t_node		*sp;
 	t_node		*cy;
 	t_node		*pl;
@@ -208,14 +208,14 @@ typedef struct s_viewport
 	t_vec	v_height;
 }	t_viewport;
 
-typedef struct s_thread_pram
+typedef struct s_thread_param
 {
 	t_img		*img;
 	t_world		*world;
 	t_viewport	viewport;
 	int			index;
 	pthread_t	thread_id;
-}	t_thread_pram;
+}	t_thread_param;
 
 typedef struct s_vars
 {
@@ -224,7 +224,7 @@ typedef struct s_vars
 	t_img		img;
 	t_obj		obj;
 	t_world		world;
-	t_thread_pram *pram;
+	t_thread_param *param;
 }	t_vars;
 
 t_mat	rotate_latitude(int);
@@ -337,6 +337,13 @@ int	set_ambient(char **info, int cnt, t_world *world)
 	return (1);
 }
 
+t_node	*get_last_node(t_node *list) // this function is called after malloc, so list is non-null.
+{
+	while (list->next)
+		list = list->next;
+	return (list);
+}
+
 int	set_light(char **info, int cnt, t_world *world)
 {
 	double	intensitiy;
@@ -344,7 +351,7 @@ int	set_light(char **info, int cnt, t_world *world)
 
 	if (cnt != 4)
 		return (0);
-	l = &(world->l);
+	l = (t_light *)(get_last_node(world->l)->data);
 	if (!set_coordinate(info[1], &(l->coord)))
 		return (0);
 	if (!get_double(info[2], &intensitiy) || intensitiy < 0 || 1 < intensitiy)
@@ -375,13 +382,6 @@ int	set_camera(char **info, int cnt, t_world *world)
 	c->norm_const = c->norm;
 	c->fov = fov;
 	return (1);
-}
-
-t_node	*get_last_node(t_node *list) // this function is called after malloc, so list is non-null.
-{
-	while (list->next)
-		list = list->next;
-	return (list);
 }
 
 int	set_plane(char **info, int cnt, t_world *world)
@@ -478,6 +478,17 @@ int	set_cone(char **info, int cnt, t_world *world)
 	return (1);
 }
 
+int	alloc_light(void **ptr)
+{
+	t_light	*l;
+
+	l = (t_light *)malloc(sizeof(t_light));
+	if (!l)
+		return (0);
+	*ptr = (void *)l;
+	return (1);
+}
+
 int	alloc_sphere(void **ptr){
 	t_sp	*sp;
 	
@@ -521,14 +532,14 @@ int	alloc_cone(void **ptr)
 
 int	alloc_new_node(t_node **node, int index)
 {
-	static int	(*allocator[4])(void **)
-		= {alloc_sphere, alloc_plane, alloc_cylinder, alloc_cone};
+	static int	(*allocator[5])(void **)
+		= {alloc_light, alloc_sphere, alloc_plane, alloc_cylinder, alloc_cone};
 
 	*node = (t_node *)malloc(sizeof(t_node));
 	if (!(*node))
 		return (0);
 	(*node)->next = 0;
-	if (!(*allocator[index - 3])(&((*node)->data)))
+	if (!(*allocator[index - 2])(&((*node)->data)))
 	{
 		free(*node);
 		return (0);
@@ -569,8 +580,10 @@ int	set_object_list(t_world *rt, int index)
 
 	if (!alloc_new_node(&new_node, index))
 		return (0);
-	objects = &(rt->sp);
-	if (index == 4)
+	objects = &(rt->l);
+	if (index == 3)
+		objects = &(rt->sp);
+	else if (index == 4)
 		objects = &(rt->pl);
 	else if (index == 5)
 		objects = &(rt->cy);
@@ -599,10 +612,10 @@ int	set_world(char *line, t_world *rt, int *mask)
 	index = check_identifier(splitted[0]);
 	if (index == -1)
 		return (free_splitted(splitted, 0)); // caller must print error if set_world returns 0.
-	if (index < 3 && (*mask & 1 << index || !(*fp[index])(splitted, cnt, rt))) // A, C, L shouldn't be on mutiple lines and don't need malloc.
+	if (index < 2 && (*mask & 1 << index || !(*fp[index])(splitted, cnt, rt))) // A, C, L shouldn't be on mutiple lines and don't need malloc.
 		return (free_splitted(splitted, 0));
 	*mask |= 1 << index;
-	if (2 < index
+	if (1 < index
 		&& (!set_object_list(rt, index)	|| !(*fp[index])(splitted, cnt, rt)))
 		return (free_splitted(splitted, 0));
 	return (free_splitted(splitted, 1));
@@ -1286,21 +1299,21 @@ t_rgb	mult_rgb_vec(t_rgb rgb, t_vec vec)
 		(int)(vec.y * rgb.g), (int)(vec.z * rgb.b)});
 }
 
-t_vec	compute_diffuse(t_vec inter, t_vec n, t_world world)
+t_vec	compute_diffuse(t_vec inter, t_vec n, t_light light)
 {
 	t_vec	ret;
 	t_vec	l;
 	double	n_dot_l;
 
 	ret = (t_vec){0, 0, 0};
-	l = vec_normalize(vec_sub(world.l.coord, inter));
+	l = vec_normalize(vec_sub(light.coord, inter));
 	n_dot_l = vec_dot(n, l);
 	if (n_dot_l > 0)
-		ret = vec_scale(rgb_to_vec(world.l.rgb), world.l.intensity * n_dot_l);
+		ret = vec_scale(rgb_to_vec(light.rgb), light.intensity * n_dot_l);
 	return (ret);
 }
 
-t_vec	compute_specular(t_vec inter, t_vec n, t_vec v, t_world world)
+t_vec	compute_specular(t_vec inter, t_vec n, t_vec v, t_light light)
 {
 	t_vec	ret;
 	t_vec	l;
@@ -1308,13 +1321,13 @@ t_vec	compute_specular(t_vec inter, t_vec n, t_vec v, t_world world)
 	double	r_dot_v;
 
 	ret = (t_vec){0, 0, 0};
-	l = vec_normalize(vec_sub(world.l.coord, inter));
+	l = vec_normalize(vec_sub(light.coord, inter));
 	r = vec_sub(vec_neg(l), vec_scale(n, 2.0 * vec_dot(n, vec_neg(l))));
 	r_dot_v = vec_dot(v, r);
 	if (r_dot_v > 0)
-		ret = vec_scale(rgb_to_vec(world.l.rgb),
-			world.l.intensity * pow(r_dot_v, S_EXP));
-    return (ret);
+		ret = vec_scale(rgb_to_vec(light.rgb), \
+			light.intensity * pow(r_dot_v, S_EXP));
+	return (ret);
 }
 
 t_vec	compute_lighting(t_vec inter, t_vec n, t_vec v, t_world world) // only for diffuse reflection, p_norm should be an unit vector
@@ -1323,15 +1336,22 @@ t_vec	compute_lighting(t_vec inter, t_vec n, t_vec v, t_world world) // only for
 	t_vec	v_diffuse;
 	t_vec	v_specular;
 	t_vec	lighting;
-	v_ambient = vec_scale(rgb_to_vec(world.l.rgb), world.a.intensity);
-	if (check_shadow(world, get_l_ray(world.l, inter)))
-		lighting = v_ambient;
-	else
-	{
-		v_diffuse = compute_diffuse(inter, n , world);
-		v_specular = compute_specular(inter, n, v, world);
-		lighting = vec_add(vec_add(v_ambient, v_diffuse), v_specular);
+	t_node	*l;
+
+	l = world.l;
+	v_ambient = vec_scale(rgb_to_vec(world.a.rgb), world.a.intensity);
+	v_diffuse = (t_vec){0, 0, 0};
+	v_specular = (t_vec){0, 0, 0};
+	while (l)
+	{	
+		if (!check_shadow(world, get_l_ray(*(t_light *)l->data, inter)))
+		{
+			v_diffuse = vec_add(v_diffuse, compute_diffuse(inter, n, *(t_light *)l->data));
+			v_specular = vec_add(v_specular, compute_specular(inter, n, v, *(t_light *)l->data));
+		}
+		l = l->next;
 	}
+	lighting = vec_add(vec_add(v_ambient, v_diffuse), v_specular);
 	lighting.x -= (lighting.x > 1.0) * (lighting.x - 1.0);
 	lighting.y -= (lighting.y > 1.0) * (lighting.y - 1.0);
 	lighting.z -= (lighting.z > 1.0) * (lighting.z - 1.0);
@@ -1632,33 +1652,61 @@ int	trace_ray(t_img *img, t_world *world, t_ray ray, int i)
 	t_vec	n;
 
 	if (!intersect(ray, *world, &obj))
-		return (0);
-	//background color
-	p = vec_add(ray.pos, vec_scale(ray.dir, obj.t));
-	n = get_tangent_norm(obj, p, ray.dir);
-	color = get_obj_rgb(obj, p,
-		compute_lighting(p, n, vec_neg(vec_normalize(ray.dir)), *world));
+		color = (t_rgb){0, 0, 0}; //background color
+	else
+	{
+		p = vec_add(ray.pos, vec_scale(ray.dir, obj.t));
+		n = get_tangent_norm(obj, p, ray.dir);
+		color = get_obj_rgb(obj, p,
+			compute_lighting(p, n, vec_neg(vec_normalize(ray.dir)), *world));
+	}
 	dot_pixel(img, color, i);
 	return (0);
 }
 /////////////////////////////////////////////////////
 
-void	*drawing(void *b_pram)
+
+t_vec	vec_translate(t_vec v, double dx, double dy, double dz)
 {
-	t_thread_pram	pram;
+	return ((t_vec){v.x + dx, v.y + dy, v.z + dz});
+}
+
+t_vec	vec_rotate_v(t_vec forward)
+{
+	t_vec	up;
+	t_vec	right;
+
+	right = vec_normalize(vec_cross(forward, get_viewport_vec(forward)));
+	up = vec_normalize(vec_cross(right, forward));
+	return (vec_add(vec_scale(forward, cos(R_RAD)), vec_scale(up, sin(R_RAD))));
+}
+
+// forward and right are on a plane and up is it's forward.
+// forward length is always 1.
+t_vec	vec_rotate_h(t_vec forward)
+{
+	t_vec	right;
+
+	right = vec_normalize(vec_cross(forward, get_viewport_vec(forward)));
+	return (vec_add(vec_scale(forward, cos(R_RAD)), vec_scale(right, sin(R_RAD))));
+}
+
+void	*drawing(void *b_param)
+{
+	t_thread_param	param;
 	t_ray			ray;
 	int				i;
 	int				j;
 
-	pram = *(t_thread_pram *)b_pram;
-	j = pram.index * (HEIGHT / THREAD) - 1;
-	while (++j < (pram.index + 1) * (HEIGHT / THREAD))
+	param = *(t_thread_param *)b_param;
+	j = param.index * (P_HEI / THREAD) - 1;
+	while (++j < (param.index + 1) * (P_HEI / THREAD))
 	{
 		i = -1;
 		while (++i < WIDTH)
 		{
-			ray = generate_ray(pram.world->c.coord, pram.viewport, i, j);
-			trace_ray(pram.img, pram.world, ray, j * WIDTH + i);
+			ray = generate_ray(param.world->c.coord, param.p_info, i, j);
+			trace_ray(param.img, param.world, ray, j * P_WID + i);
 		}
 	}
 	return (0);
@@ -1678,24 +1726,24 @@ int draw_img(t_vars *vars)
 	i = -1;
 	while (++i < THREAD)
 	{
-		vars->pram[i].viewport = viewport;
-		if (pthread_create(&(vars->pram[i].thread_id), NULL, drawing, vars->pram + i))
+		vars->param[i].p_info = p_info;
+		if (pthread_create(&(vars->param[i].thread_id), NULL, drawing, vars->param + i))
 			return (0);
 	}
 	i = -1;
 	while (++i < THREAD)
-		pthread_join(vars->pram[i].thread_id, &tmp);
+		pthread_join(vars->param[i].thread_id, &tmp);
 	mlx_put_image_to_window(vars->mlx, vars->win, vars->img.ptr, 0, 0);
 	return (1);
 }
 
 
-int	create_thread_pram(t_vars *vars, t_thread_pram **pram)
+int	create_thread_param(t_world *world, t_vars *vars, t_thread_param **param)
 {
-	t_thread_pram	*ret;
+	t_thread_param	*ret;
 	int				i;
 
-	ret = (t_thread_pram *)malloc(sizeof(t_thread_pram) * THREAD);
+	ret = (t_thread_param *)malloc(sizeof(t_thread_param) * THREAD);
 	if (ret == NULL)
 		return (0);
 	i = -1;
@@ -1705,7 +1753,7 @@ int	create_thread_pram(t_vars *vars, t_thread_pram **pram)
 		ret[i].world = &(vars->world);
 		ret[i].index = i;
 	}
-	*pram = ret;
+	*param = ret;
 	return (1);
 }
 
@@ -1809,7 +1857,7 @@ int	main(int argc, char **argv)
 	int				fd;
 	t_vars			vars;
 	t_world			*world;
-	t_thread_pram	*pram;
+	t_thread_param	*param;
 
 	if (argc != 2)
 		return (0); // call error handling function with proper error message.
@@ -1826,13 +1874,13 @@ int	main(int argc, char **argv)
 	{
 		init_mlx_pointers(&vars);
 		printf("%s\n", "valid format");
-		if (!create_thread_pram(&vars, &pram))
+		if (!create_thread_param(&world, &vars, &param))
 		{
 			//free
 			return (1);
 		}
-		vars.pram = pram;
-		if (!draw_img(&vars))
+		vars.param = param;
+		if (!draw_img(&world, &vars))
 		{
 			//free
 			return (1);
