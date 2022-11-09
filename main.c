@@ -25,7 +25,7 @@
 #define P_WID 		1280
 #define P_HEI		720
 #define THREAD		12
-#define ANGLE		30
+#define ANGLE		10
 
 #define W			119 // linux 119,  mac 13 move up
 #define A			97  // linux 97, mac 0  move left
@@ -44,6 +44,7 @@
 //#define	INFINITY	1e500
 #define	S_EXP		32 // specular exponent
 // .rt 파일에서 비어있는 줄에 공백이 들어가면 모든 내용이 올바른 형식으로 들어와도 invalid format이라고 뜨고 종료한다. 처리하고싶으면 처리하자.
+
 typedef struct s_img
 {
 	void	*ptr;
@@ -223,6 +224,9 @@ typedef struct s_vars
 	t_thread_param *param;
 }	t_vars;
 
+t_mat	rotate_latitude(int);
+t_mat	rotate_longitude(int);
+
 int	check_rgb(t_rgb rgb)
 {
 	int	r;
@@ -235,7 +239,7 @@ int	check_rgb(t_rgb rgb)
 	return (-1 < r && r < 256 && -1 < g && g < 256 && -1 < b && b < 256);
 }
 
-int	init_mlx_pointers(t_vars *vars, t_world world)
+int	init_mlx_pointers(t_vars *vars)
 {
 	vars->mlx = mlx_init();
 	if (!vars->mlx)
@@ -253,7 +257,6 @@ int	init_mlx_pointers(t_vars *vars, t_world world)
 	vars->obj.type = NONE;
 	vars->obj.object = 0;
 	vars->obj.t = 0;
-	vars->world = world;
 	return (1);
 }
 
@@ -690,6 +693,11 @@ double	vec4_dot(t_vec4 v1, t_vec4 v2)
 	return (v1.x * v2.x + v1.y * v2.y + v1.z * v2.z + v1.w * v2.w);
 }
 
+t_vec	vec4_to_vec(t_vec4 v)
+{
+	return ((t_vec){v.x, v.y, v.z});
+}
+
 t_vec4	vec_to_vec4(t_vec v)
 {
 	return ((t_vec4){v.x, v.y, v.z, 1});
@@ -907,12 +915,12 @@ t_vec	rotate_normal(t_vec vec, t_mat op) // forward를 z축으로 변환 후 op 
 
 	rx = get_rx_to_z(vec);
 	res = mat_mul_vec4(rx, vec_to_vec4(vec));
-	ry = get_ry_to_z((t_vec){res.x, res.y, res.z});
+	ry = get_ry_to_z(vec4_to_vec(res));
 	res = mat_mul_vec4(ry, res);
 	res = mat_mul_vec4(op, res);
 	res = mat_mul_vec4(mat_transpose(ry), res);
 	res = mat_mul_vec4(mat_transpose(rx), res);
-	return ((t_vec){res.x, res.y, res.z});
+	return (vec4_to_vec(res));
 }
 
 /***************************************************************************/
@@ -1373,7 +1381,9 @@ t_uv	uv_map_plane(t_coord p, t_pl pl)
 
 	e1 = vec_cross(pl.norm, get_basis_vec(pl.norm));
 	e2 = vec_cross(pl.norm, e1);
-	return ((t_uv){vec_dot(p, e1) / P_WID, vec_dot(p, e2) / P_WID});
+	return ((t_uv){fabs(fmod(vec_dot(p, e1), 100)) / 100,
+		fabs(fmod(vec_dot(p, e2), 100)) / 100});
+	// return ((t_uv){vec_dot(p, e1) / P_WID, vec_dot(p, e2) / P_WID});
 }
 
 t_uv	uv_map_cylinder(t_coord p, t_cy cy)
@@ -1454,33 +1464,53 @@ t_vec	get_basis_vec(t_vec v)
 	return (by);
 }
 
-t_vec	get_viewport_vec(t_vec v)
+t_vec	get_viewport_vec(t_camera c, t_vec4 axis)
 {
-	if (vec_len(vec_cross(v, (t_vec){0, 0, 1})) < 1e-6)
-		return (vec_normalize((t_vec){1, 0, 1}));
-	return ((t_vec){0, 0, 1});
+	return (vec4_to_vec(mat_mul_vec4(
+		mat_mul(rotate_longitude(c.longi), rotate_latitude(c.lati)),
+		axis)));
 }
+
+// void	make_viewport(t_camera c, t_vec *h, t_vec *v)
+// {
+// 	// this method doesn't make sense.
+// 	// t_mat	rx;
+// 	// t_mat	ry;
+// 	// t_mat	inv;
+// 	// t_vec4	rotated;
+
+// 	// rx = get_rx_to_z(c.norm);
+// 	// rotated = mat_mul_vec4(rx, vec_to_vec4(c.norm));
+// 	// ry = get_ry_to_z(vec4_to_vec(rotated));
+// 	// rotated = mat_mul_vec4(ry, rotated);
+// 	// inv = mat_mul(mat_transpose(rx), mat_transpose(ry));
+// 	// *h = vec4_to_vec(mat_mul_vec4(inv, (t_vec4){0, -1, 0, 1}));
+// 	// *v = vec4_to_vec(mat_mul_vec4(inv, (t_vec4){1, 0, 0, 1}));
+// }
 
 void	get_pixel_info(t_camera c, t_p_info *p_info)
 {
 	t_vec	h;
 	t_vec	v;
-	t_vec	tmp;
+	t_vec	top_left;
 	double	vp_h;
 	double	vp_w;
 
 	vp_w = tan((c.fov * M_PI / 180.0) / 2.0) * 2;
-	vp_h = vp_w * ((double)P_HEI / (double)P_WID);
-	h = vec_cross(c.norm, get_viewport_vec(c.norm));
-	v = vec_cross(c.norm, h);
-	h = vec_scale(h, (double)1 / vec_len(h) * (vp_w / (double)P_WID));
-	v = vec_scale(v, (double)1 / vec_len(v) * (vp_h / (double)P_HEI));
+	vp_h = vp_w * P_HEI / P_WID;
+	// h = vec_cross(c.norm, get_viewport_vec(c.norm));
+	// v = vec_cross(c.norm, h);
+	// make_viewport(c, &h, &v);
+	h = get_viewport_vec(c, (t_vec4){0, -1, 0, 1});
+	v = get_viewport_vec(c, (t_vec4){1, 0, 0, 1});
+	h = vec_scale(h, 1.0 / vec_len(h) * (vp_w / P_WID));
+	v = vec_scale(v, 1.0 / vec_len(v) * (vp_h / P_HEI));
+	top_left = vec_add(c.coord, c.norm);
+	top_left = vec_sub(top_left, vec_scale(h, P_WID / 2.0));
+	top_left = vec_sub(top_left, vec_scale(v, P_HEI / 2.0));
 	p_info->p_h = h;
 	p_info->p_v = v;
-	tmp = vec_add(c.coord, c.norm);
-	tmp = vec_sub(tmp, vec_scale(h, (double)P_WID / (double)2));
-	tmp = vec_sub(tmp, vec_scale(v, (double)P_HEI / (double)2));
-	p_info->top_left = tmp;
+	p_info->top_left = top_left;
 }
 
 /////////////////////////////////////////////////////
@@ -1507,8 +1537,8 @@ t_rgb	get_obj_rgb(t_obj obj, t_coord p, t_vec lighting)
 		// ret = ((t_sp *)obj.object)->rgb;
 		ret = uv_pattern_at(uv_map_sphere(p, *((t_sp *)obj.object)), 16, 8);
 	else if (obj.type == PLANE)
-		ret = ((t_pl *)obj.object)->rgb;
-		// ret = uv_pattern_at(uv_map_plane(p, *((t_pl *)obj.object)), 160, 160);
+		// ret = ((t_pl *)obj.object)->rgb;
+		ret = uv_pattern_at(uv_map_plane(p, *((t_pl *)obj.object)), 16, 16);
 	else if (obj.type == CYLINDER)
 		ret = ((t_cy *)obj.object)->rgb;
 		// ret = uv_pattern_at(uv_map_cylinder(p, *((t_cy *)obj.object)), 16, 8);
@@ -1683,13 +1713,17 @@ void	*drawing(void *b_param)
 	return (0);
 }
 
-int draw_img(t_world *world, t_vars *vars)
+int draw_img(t_vars *vars)
 {
 	t_p_info	p_info;
 	void		*tmp;
 	int			i;
-
-	get_pixel_info(world->c, &p_info);
+/////////////////////// key_press_handler doesn't change world's value.
+	// t_camera c = world->c;
+	// print_vector("normal: ", c.norm);
+	// print_vector("coordinate: ", c.coord);
+///////////////////////
+	get_pixel_info(vars->world.c, &p_info);
 	i = -1;
 	while (++i < THREAD)
 	{
@@ -1717,7 +1751,7 @@ int	create_thread_param(t_world *world, t_vars *vars, t_thread_param **param)
 	while (++i < THREAD)
 	{
 		ret[i].img = &vars->img;
-		ret[i].world = world;
+		ret[i].world = &(vars->world);
 		ret[i].index = i;
 	}
 	*param = ret;
@@ -1797,22 +1831,23 @@ int	key_press_handler(int code, t_vars *vars)
 	else if (code == W || code == A || code == S || code == D
 		|| code == Q || code == E)
 		translate_object(vars->obj, code);
-	draw_img(&(vars->world), vars);
+	draw_img(vars);
 	return (0);
 }
 
-int	mouse_handler(int code, t_vars *vars)
+int	mouse_handler(int button, int x, int y, t_vars *vars)
 {
 	(void)vars;
-	printf("%d\n", code);
+	(void)button;
+	printf("%d, %d\n", x, y);
 	return (0);
 }
 
 int	main(int argc, char **argv)
 {
 	int				fd;
-	t_world			world;
 	t_vars			vars;
+	t_world			*world;
 	t_thread_param	*param;
 
 	if (argc != 2)
@@ -1820,15 +1855,15 @@ int	main(int argc, char **argv)
 	fd = open_file(argv[1]);
 	if (fd < 0) // remove this when error handling function is completed.
 		return (0); // 에러 문자열 출력하고 처리해주기
-	world.l = 0;
-	world.sp = 0;
-	world.pl = 0;
-	world.cy = 0;
-	world.cn = 0;
-	param = NULL;
-	if (read_file(fd, &world))
+	world = &(vars.world);
+	world->sp = 0;
+	world->pl = 0;
+	world->cy = 0;
+	world->cn = 0;
+	pram = NULL;
+	if (read_file(fd, world))
 	{
-		init_mlx_pointers(&vars, world);
+		init_mlx_pointers(&vars);
 		printf("%s\n", "valid format");
 		if (!create_thread_param(&world, &vars, &param))
 		{
@@ -1841,18 +1876,17 @@ int	main(int argc, char **argv)
 			//free
 			return (1);
 		}
-		vars.obj.type = CYLINDER;
-		vars.obj.object = world.cy->data;
+		vars.obj.type = CAMERA;
+		vars.obj.object = &(world->c);//world->pl->data; 
 		mlx_key_hook(vars.win, key_press_handler, &vars);
 		mlx_mouse_hook(vars.win, mouse_handler, &vars);
 		mlx_loop(vars.mlx);
 	}
 	else
 		printf("%s\n", "invalid format");
-	clear_list(&(world.l));
-	clear_list(&(world.sp));
-	clear_list(&(world.pl));
-	clear_list(&(world.cy));
-	clear_list(&(world.cn));
+	clear_list(&(world->sp));
+	clear_list(&(world->pl));
+	clear_list(&(world->cy));
+	clear_list(&(world->cn));
 	return (0);
 }
