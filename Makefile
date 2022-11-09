@@ -1,4 +1,4 @@
-NAME = minirt
+NAME = miniRT
 SRCS = checker.c\
        converter.c\
        get_next_line.c\
@@ -14,22 +14,23 @@ RM = rm
 RMFLAGS = -f
 
 %.o : %.c
-	$(CC) $(CFLAGS) -I/usr/include -Imlx_linux -O3 -c $< -o $@ -pthread
-#	$(CC) $(CFLAGS) -I/usr/include -Imlx_linux -g -c $< -o $@ -pthread
+	$(CC) $(CFLAGS) -Imlx -O3 -c $< -o $@
 
 all : $(NAME)
 
 $(NAME) : $(OBJS)
-	$(CC) $(OBJS) -Lmlx_linux -lmlx_Linux -L/usr/lib -Imlx_linux -lXext -lX11 -lm -lz -o $(NAME) -pthread
-
-bonus: $(NAME)
+	@make -C mlx 2> /dev/null
+	$(CC) $(OBJS) -Lmlx -lmlx -framework OpenGL -framework AppKit -o $(NAME)
 
 clean :
+	@make clean -C mlx
 	$(RM) $(RMFLAGS) $(OBJS)
 
 fclean : clean
 	$(RM) $(RMFLAGS) $(NAME)
 
+bonus : $(NAME)
+
 re : fclean all
 
-.PHONY : all bonus clean fclean re 
+.PHONY : all clean fclean re bonus
