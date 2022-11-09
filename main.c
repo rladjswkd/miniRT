@@ -225,6 +225,7 @@ typedef struct s_vars
 	void		*win;
 	t_img		img;
 	t_img		b_img;
+	char		*b_map;
 	t_obj		obj;
 }	t_vars;
 
@@ -252,28 +253,31 @@ int	check_rgb(t_rgb rgb)
 	return (-1 < r && r < 256 && -1 < g && g < 256 && -1 < b && b < 256);
 }
 
-void	convert_color_to_grayscale(t_img *img)
+char	*get_bump_map(t_img *img)
 {
 	int				i;
 	int				j;
 	unsigned char	color;
 	int				pixel;
+	char			*b_map;
 
+	b_map = (char *)malloc(sizeof(char) * img->width * img->height);
+	if (!b_map)
+		return (0);
 	j = -1;
 	while (++j < img->height)
 	{
 		i = -1;
 		while (++i < img->width)
 		{
-			pixel = (i + j * img->width) * 4;
-			color = 0.11 * (unsigned char)img->addr[pixel] + \
-			0.59 * (unsigned char)img->addr[pixel + 1] + \
-			0.3 * (unsigned char)img->addr[pixel + 2];
-			img->addr[pixel] = color;
-			img->addr[pixel + 1] = color;
-			img->addr[pixel + 2] = color;
+			pixel = i + j * img->width;
+			color = 0.11 * (unsigned char)img->addr[pixel * 4] + \
+			0.59 * (unsigned char)img->addr[(pixel + 1) * 4] + \
+			0.3 * (unsigned char)img->addr[(pixel + 2) * 4];
+			b_map[pixel] = color;
 		}
 	}
+	return (b_map);
 }
 
 int	init_mlx_pointers(t_vars *vars)
@@ -299,7 +303,7 @@ int	init_mlx_pointers(t_vars *vars)
 	&vars->b_img.bits_per_pixel, &vars->b_img.line_length, &vars->b_img.endian);
 	if (!vars->b_img.addr)
 		return (0);
-	convert_color_to_grayscale(&vars->b_img);
+	vars->b_map = get_bump_map(&vars->b_img);
 	vars->obj.type = NONE;
 	vars->obj.object = 0;
 	vars->obj.t = 0;
@@ -1820,7 +1824,7 @@ t_vec	get_tangent_norm(t_obj	obj, t_coord p, t_vec ray_dir)
 	return (n);
 }
 
-t_vec	get_bump_norm(t_img *b_img, t_obj obj, t_vec p, t_vec n)
+t_vec	get_bump_norm(t_vars *vars, t_obj obj, t_vec p, t_vec n)
 {
 	t_vec	ret;
 	t_uv	uv;
@@ -1837,9 +1841,9 @@ t_vec	get_bump_norm(t_img *b_img, t_obj obj, t_vec p, t_vec n)
 		uv = uv_map_plane(p, *(t_pl *)obj.object);
 	else if (obj.type == CONE)
 		uv = uv_map_cone(p, *(t_cn *)obj.object);
-	i = b_img->width * uv.u + (int)(b_img->height * uv.v) * b_img->width;
-	bu = b_img->addr[i * 4] - b_img->addr[(i + 1) * 4];
-	bv = b_img->addr[i * 4] - b_img->addr[(b_img->width + i) * 4];
+	i = vars->b_img.width * uv.u + (int)(vars->b_img.height * uv.v) * vars->b_img.width;
+	bu = vars->b_map[i] - vars->b_map[i + 1];
+	bv = vars->b_map[i] - vars->b_map[vars->b_img.width + i];
 	bu /= BUMP_HIGHT_WEIGHT;
 	bv /= BUMP_HIGHT_WEIGHT;
 	ret = vec_sub(vec_scale(vec_cross(n, uv.pv), bu), \
@@ -1872,7 +1876,7 @@ int	trace_ray(t_vars *vars, t_world *world, t_ray ray, int i)
   	p = vec_add(ray.pos, vec_scale(ray.dir, obj.t));
 	  n = get_tangent_norm(obj, p, ray.dir);
 	  if (get_status(obj.type, obj.object) & BUMP)
-	  	n = get_bump_norm(&vars->b_img, obj, p, n);
+	  	n = get_bump_norm(vars, obj, p, n);
 	  color = get_obj_rgb(vars, obj, p,
 	  	compute_lighting(p, n, vec_neg(vec_normalize(ray.dir)), *world));
   }
@@ -2145,6 +2149,7 @@ int	main(int argc, char **argv)
 	clear_list(&(world.pl));
 	clear_list(&(world.cy));
 	clear_list(&(world.cn));
+	// free(vars.b_map);
 	// free(param);
 	return (0);
 }
