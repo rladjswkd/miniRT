@@ -1436,11 +1436,16 @@ t_uv	uv_map_plane(t_coord p, t_pl pl)
 {
 	t_vec	e1;
 	t_vec	e2;
+	double	u;
+	double	v;
 
 	e1 = vec_cross(pl.norm, get_basis_vec(pl.norm));
 	e2 = vec_cross(pl.norm, e1);
-	return ((t_uv){fabs(fmod(vec_dot(p, e1), 100)) / 100,
-		fabs(fmod(vec_dot(p, e2), 100)) / 100,
+	u = fmod(vec_dot(p, e1), 100);
+	v = fmod(vec_dot(p, e2), 100);
+	u = 100 * (u < 0) + u;
+	v = 100 * (v < 0) + v;
+	return ((t_uv){u / 100,	v / 100,
 		vec_normalize(e1),
 		vec_normalize(e2)});
 }
@@ -1808,7 +1813,7 @@ t_vec	get_tangent_norm_cn(t_cn *cn, t_coord p, t_vec ray_dir)
 	return (ret);
 }
 
-t_vec	get_tangent_norm(t_obj	obj, t_coord p, t_vec ray_dir)
+t_vec	get_tangent_norm(t_obj obj, t_coord p, t_vec ray_dir)
 {
 	t_vec	n;
 
@@ -2013,13 +2018,15 @@ t_mat	rotate_longitude(int angle)
 	return (mat_ry(cos(rad), sin(rad)));
 }
 
-void	rotate_object(t_obj obj, int keycode)
+void	rotate_object(t_thread_param *param, int keycode)
 {
+	t_obj		obj;
 	t_obj_info	*current_object;
 	int			latitude;
 	int			longitude;
 	int			type;
 
+	obj = param->vars->obj;
 	type = obj.type;
 	if (type == LIGHT || type == SPHERE)
 		return ;
@@ -2037,30 +2044,20 @@ void	rotate_object(t_obj obj, int keycode)
 		mat_mul(rotate_longitude(longitude), rotate_latitude(latitude)));
 }
 
-void	translate_object(t_obj obj, int keycode)
+void	translate_object(t_thread_param *param, int keycode)
 {
-	// t_obj_info	*current_object;
-	// t_vec4		translated;
-
-	// current_object = (t_obj_info *)(obj.object);
-	// translated = mat_mul_vec4(
-	// 	mat_translation(
-	// 		(keycode == W) - (keycode == S),
-	// 		(keycode == D) - (keycode == A),
-	// 		(keycode == E) - (keycode == Q)),
-	// 	vec_to_vec4(current_object->coord));
-	// current_object->coord = (t_vec){translated.x, translated.y, translated.z};
 	t_obj_info	*current_object;
-	t_coord		translated;
+	t_camera	camera;
+	t_vec		d_vec;
 
-	current_object = (t_obj_info *)(obj.object);
-	translated = current_object->coord;
-	translated = (t_vec){
-		translated.x + (keycode == W) - (keycode == S),
-		translated.y + (keycode == D) - (keycode == A),
-		translated.z + (keycode == E) - (keycode == Q)
-	};
-	current_object->coord = translated;
+	current_object = (t_obj_info *)(param->vars->obj.object);
+	camera = param->world->c;
+	d_vec = vec_add(
+		vec_add(
+			vec_scale(get_viewport_vec(camera, (t_vec4){-1, 0, 0, 1}), (keycode == E) - (keycode == Q)),
+			vec_scale(get_viewport_vec(camera, (t_vec4){0, -1, 0, 1}), (keycode == D) - (keycode == A))),
+		vec_scale(camera.norm, (keycode == W) - (keycode == S)));
+	current_object->coord = vec_add(current_object->coord, d_vec);
 }
 
 int	key_press_handler(int code, t_thread_param *param)
@@ -2073,10 +2070,10 @@ int	key_press_handler(int code, t_thread_param *param)
 	if (vars->obj.type == NONE)
 		return (0);
 	if (code == ONE || code == TWO || code == THREE || code == FOUR)
-		rotate_object(vars->obj, code);
+		rotate_object(param, code);
 	else if (code == W || code == A || code == S || code == D
 		|| code == Q || code == E)
-		translate_object(vars->obj, code);
+		translate_object(param, code);
 	else if (code == K) {
 		vars->obj.type = CAMERA;
 		vars->obj.object = &(param->world->c);
