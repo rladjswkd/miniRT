@@ -22,27 +22,44 @@
 #define UP			126
 #define RIGHT		124
 #define DOWN		125
-#define P_WID 		1920
-#define P_HEI		1080
+
 #define BUMP_HIGHT_WEIGHT	100
 #define BUMP_IMG	"bump.png"
-#define THREAD		8
-#define R_RAD		M_PI / 18
-#define Q			12 // linux 113
-#define E			14 // linux 101
-#define W			97  // linux 97
-#define A			115 // linux 115
-#define S			113 // linux 113
-#define D			101 // linux 101
-#define C			8 // linux
-#define B			11 // linux
-#define I			34 // linux
+
 #define CHECKER		1
 #define IMAGE		2
 #define BUMP		4
+
+#define WIDTH 		1280
+#define HEIGHT		720
+#define THREAD		12
+#define ANGLE		10
+
+#define	MOUSE_LEFT	1
+
+#define W			13 // linux 119,  mac 13 move up
+#define A			0  // linux 97, mac 0  move left
+#define S			1 // linux 115, mac 1  move down
+#define D			2 // linux 100, mac 2  move right
+#define Q			12 // linux 113, mac 12 move forward
+#define E			14 // linux 101, mac 14 move backward
+
+#define ONE			18 // linux 49, mac 18 rotate forward
+#define TWO			19 // linux 50, mac 19 rotate backward
+#define THREE		20 // linux 51, mac 20 choose rotate circle forward
+#define FOUR		21 // linux 52, mac 21 choose rotate circle backward
+
+#define C			8 // linux
+#define B			11 // linux
+#define I			34 // linux
+
+#define K			40 // linux , mac 40 select camera
+#define Z			6  // linux 122, mac 6  move forward
+#define X			7  // linux 120, mac 7  move back
 //#define	INFINITY	1e500
 #define	S_EXP		32 // specular exponent
 // .rt 파일에서 비어있는 줄에 공백이 들어가면 모든 내용이 올바른 형식으로 들어와도 invalid format이라고 뜨고 종료한다. 처리하고싶으면 처리하자.
+
 typedef struct s_img
 {
 	void	*ptr;
@@ -81,6 +98,9 @@ typedef struct s_obj_info
 {
 	t_coord	coord;
 	t_vec	norm;
+	int		lati;
+	int		longi;
+	t_vec	norm_const;
 }	t_obj_info;
 
 typedef struct s_ambient
@@ -100,6 +120,9 @@ typedef struct s_camera
 {
 	t_coord	coord;
 	t_vec	norm;
+	int		lati;
+	int		longi;
+	t_vec	norm_const;
 	int		fov;
 }	t_camera;
 
@@ -115,6 +138,9 @@ typedef struct s_plane
 {
 	t_coord	coord;
 	t_vec	norm;
+	int		lati;
+	int		longi;
+	t_vec	norm_const;
 	t_rgb	rgb;
 	int		status;
 }	t_pl;
@@ -123,6 +149,9 @@ typedef struct s_cylinder
 {
 	t_coord	coord;
 	t_vec	norm;
+	int		lati;
+	int		longi;
+	t_vec	norm_const;
 	double	diameter;
 	double	height;
 	t_rgb	rgb;
@@ -141,7 +170,7 @@ typedef struct s_world
 {
 	t_ambient	a;
 	t_camera	c;
-	t_light		l;
+	t_node		*l;
 	t_node		*sp;
 	t_node		*cy;
 	t_node		*pl;
@@ -177,20 +206,18 @@ typedef struct s_vec4
 
 typedef struct s_mat
 {
-	t_vec4	r1;
-	t_vec4	r2;
-	t_vec4	r3;
-	t_vec4	r4;
+	double	arr[4][4];
+	int		len;
 }	t_mat;
 
 t_vec	get_basis_vec(t_vec);
 
-typedef struct s_pixel_info
+typedef struct s_viewport
 {
 	t_coord	top_left;
-	t_vec	p_h;
-	t_vec	p_v;
-}	t_p_info;
+	t_vec	v_width;
+	t_vec	v_height;
+}	t_viewport;
 
 typedef struct s_vars
 {
@@ -201,14 +228,17 @@ typedef struct s_vars
 	t_obj		obj;
 }	t_vars;
 
-typedef struct s_thread_pram
+typedef struct s_thread_param
 {
 	t_vars		*vars;
 	t_world		*world;
 	t_p_info	p_info;
 	int			index;
 	pthread_t	thread_id;
-}	t_thread_pram;
+}	t_thread_param;
+
+t_mat	rotate_latitude(int);
+t_mat	rotate_longitude(int);
 
 int	check_rgb(t_rgb rgb)
 {
@@ -251,10 +281,10 @@ int	init_mlx_pointers(t_vars *vars)
 	vars->mlx = mlx_init();
 	if (!vars->mlx)
 		return (0);
-	vars->win = mlx_new_window(vars->mlx, P_WID, P_HEI, "miniRT");
+	vars->win = mlx_new_window(vars->mlx, WIDTH, HEIGHT, "miniRT");
 	if (!vars->win)
 		return (0);
-	vars->img.ptr = mlx_new_image(vars->mlx, P_WID, P_HEI);
+	vars->img.ptr = mlx_new_image(vars->mlx, WIDTH, HEIGHT);
 	if (!vars->img.ptr)
 		return (0);
 	vars->img.addr = mlx_get_data_addr(vars->img.ptr, &vars->img.bits_per_pixel,
@@ -270,6 +300,9 @@ int	init_mlx_pointers(t_vars *vars)
 	if (!vars->b_img.addr)
 		return (0);
 	convert_color_to_grayscale(&vars->b_img);
+	vars->obj.type = NONE;
+	vars->obj.object = 0;
+	vars->obj.t = 0;
 	return (1);
 }
 
@@ -347,6 +380,13 @@ int	set_ambient(char **info, int cnt, t_world *world)
 	return (1);
 }
 
+t_node	*get_last_node(t_node *list) // this function is called after malloc, so list is non-null.
+{
+	while (list->next)
+		list = list->next;
+	return (list);
+}
+
 int	set_light(char **info, int cnt, t_world *world)
 {
 	double	intensitiy;
@@ -354,7 +394,7 @@ int	set_light(char **info, int cnt, t_world *world)
 
 	if (cnt != 4)
 		return (0);
-	l = &(world->l);
+	l = (t_light *)(get_last_node(world->l)->data);
 	if (!set_coordinate(info[1], &(l->coord)))
 		return (0);
 	if (!get_double(info[2], &intensitiy) || intensitiy < 0 || 1 < intensitiy)
@@ -380,15 +420,11 @@ int	set_camera(char **info, int cnt, t_world *world)
 		return (0);
 	if (!get_int(info[3], &fov)	|| fov < 0 || 180 < fov) // 180 0
 		return (0);
+	c->lati = 0;
+	c->longi = 0;
+	c->norm_const = c->norm;
 	c->fov = fov;
 	return (1);
-}
-
-t_node	*get_last_node(t_node *list) // this function is called after malloc, so list is non-null.
-{
-	while (list->next)
-		list = list->next;
-	return (list);
 }
 
 int	set_plane(char **info, int cnt, t_world *world)
@@ -406,6 +442,9 @@ int	set_plane(char **info, int cnt, t_world *world)
 	if (!set_rgb(info[3], &(pl->rgb)))
 		return (0);
 	pl->status = 0;
+	pl->longi = 0;
+	pl->lati = 0;
+	pl->norm_const = pl->norm;
 	return (1);
 }
 
@@ -448,6 +487,9 @@ int	set_cylinder(char **info, int cnt, t_world *world)
 		return (0);
 	if (!set_rgb(info[5], &(cy->rgb)))
 		return (0);
+	cy->lati = 0;
+	cy->longi = 0;
+	cy->norm_const = cy->norm;
 	cy->diameter = diameter;
 	cy->height = height;
 	cy->status = 0;
@@ -474,9 +516,23 @@ int	set_cone(char **info, int cnt, t_world *world)
 		return (0);
 	if (!set_rgb(info[5], &(cn->rgb)))
 		return (0);
+	cn->lati = 0;
+	cn->longi = 0;
+	cn->norm_const = cn->norm;	
 	cn->diameter = diameter;
 	cn->height = height;
 	cn->status = 0;
+	return (1);
+}
+
+int	alloc_light(void **ptr)
+{
+	t_light	*l;
+
+	l = (t_light *)malloc(sizeof(t_light));
+	if (!l)
+		return (0);
+	*ptr = (void *)l;
 	return (1);
 }
 
@@ -523,14 +579,14 @@ int	alloc_cone(void **ptr)
 
 int	alloc_new_node(t_node **node, int index)
 {
-	static int	(*allocator[4])(void **)
-		= {alloc_sphere, alloc_plane, alloc_cylinder, alloc_cone};
+	static int	(*allocator[5])(void **)
+		= {alloc_light, alloc_sphere, alloc_plane, alloc_cylinder, alloc_cone};
 
 	*node = (t_node *)malloc(sizeof(t_node));
 	if (!(*node))
 		return (0);
 	(*node)->next = 0;
-	if (!(*allocator[index - 3])(&((*node)->data)))
+	if (!(*allocator[index - 2])(&((*node)->data)))
 	{
 		free(*node);
 		return (0);
@@ -571,8 +627,10 @@ int	set_object_list(t_world *rt, int index)
 
 	if (!alloc_new_node(&new_node, index))
 		return (0);
-	objects = &(rt->sp);
-	if (index == 4)
+	objects = &(rt->l);
+	if (index == 3)
+		objects = &(rt->sp);
+	else if (index == 4)
 		objects = &(rt->pl);
 	else if (index == 5)
 		objects = &(rt->cy);
@@ -601,10 +659,10 @@ int	set_world(char *line, t_world *rt, int *mask)
 	index = check_identifier(splitted[0]);
 	if (index == -1)
 		return (free_splitted(splitted, 0)); // caller must print error if set_world returns 0.
-	if (index < 3 && (*mask & 1 << index || !(*fp[index])(splitted, cnt, rt))) // A, C, L shouldn't be on mutiple lines and don't need malloc.
+	if (index < 2 && (*mask & 1 << index || !(*fp[index])(splitted, cnt, rt))) // A, C, L shouldn't be on mutiple lines and don't need malloc.
 		return (free_splitted(splitted, 0));
 	*mask |= 1 << index;
-	if (2 < index
+	if (1 < index
 		&& (!set_object_list(rt, index)	|| !(*fp[index])(splitted, cnt, rt)))
 		return (free_splitted(splitted, 0));
 	return (free_splitted(splitted, 1));
@@ -663,6 +721,259 @@ t_vec	vec_neg(t_vec vec)
 {
 	return ((t_vec){-vec.x, -vec.y, -vec.z});
 }
+
+void	print_vector(char *str, t_vec vec) //////////
+{
+	printf("%s", str);
+	printf("<%f\t%f\t%f>\n", vec.x, vec.y, vec.z);
+}
+
+/********************matrices*************************/
+void	print_matrix(t_mat mat) //////////
+{
+	printf("|%f,\t%f,\t%f,\t%f|\n|%f,\t%f,\t%f,\t%f|\n|%f,\t%f,\t%f,\t%f|\n|%f,\t%f,\t%f,\t%f|\n\n",
+		mat.arr[0][0], mat.arr[0][1], mat.arr[0][2], mat.arr[0][3],
+		mat.arr[1][0], mat.arr[1][1], mat.arr[1][2], mat.arr[1][3],
+		mat.arr[2][0], mat.arr[2][1], mat.arr[2][2], mat.arr[2][3],
+		mat.arr[3][0], mat.arr[3][1], mat.arr[3][2], mat.arr[3][3]);
+}
+
+double	vec4_dot(t_vec4 v1, t_vec4 v2)
+{
+	return (v1.x * v2.x + v1.y * v2.y + v1.z * v2.z + v1.w * v2.w);
+}
+
+t_vec	vec4_to_vec(t_vec4 v)
+{
+	return ((t_vec){v.x, v.y, v.z});
+}
+
+t_vec4	vec_to_vec4(t_vec v)
+{
+	return ((t_vec4){v.x, v.y, v.z, 1});
+}
+
+t_vec4	arr_to_vec4(double arr[4])
+{
+	return ((t_vec4){arr[0], arr[1], arr[2], arr[3]});
+}
+
+t_mat	mat_transpose(t_mat	mat)
+{
+	return ((t_mat){{
+		{mat.arr[0][0], mat.arr[1][0], mat.arr[2][0], mat.arr[3][0]},
+		{mat.arr[0][1], mat.arr[1][1], mat.arr[2][1], mat.arr[3][1]},
+		{mat.arr[0][2], mat.arr[1][2], mat.arr[2][2], mat.arr[3][2]},
+		{mat.arr[0][3], mat.arr[1][3], mat.arr[2][3], mat.arr[3][3]}
+		}, mat.len});
+}
+
+t_mat	mat_submat(t_mat mat, int r, int c)
+{
+	t_mat	ret;
+	int		ret_i;
+	int		ret_j;
+	int		i;
+	int		j;
+
+	i = -1;
+	ret_i = -1;
+	while (++i < mat.len)
+	{
+		if (i == r)
+			continue ;
+		++ret_i;
+		j = -1;
+		ret_j = -1;
+		while (++j < mat.len)
+		{
+			if (j == c)
+				continue ;
+			ret.arr[ret_i][++ret_j] = mat.arr[i][j];
+		}
+	}
+	ret.len = mat.len - 1;
+	return (ret);
+}
+
+double	mat_determinant(t_mat mat)
+{
+	double	det;
+	int		i;
+
+	det = 0;
+	if (mat.len == 2)
+		return (mat.arr[0][0] * mat.arr[1][1] - mat.arr[0][1] * mat.arr[1][0]);
+	i = -1;
+	while (++i < mat.len)
+		det += mat.arr[0][i]
+			* (1 - 2 * (i % 2)) * mat_determinant(mat_submat(mat, 0, i));
+	return (det);
+}
+
+t_mat	mat_comatrix(t_mat mat)
+{
+	t_mat	comatrix;
+	int		i;
+	int		j;
+	int		len;
+
+	len = mat.len;	
+	i = -1;
+	while (++i < len)
+	{
+		j = -1;
+		while (++j < len)
+			comatrix.arr[i][j] = (1 - 2 * ((i + j) % 2))
+				* mat_determinant(mat_submat(mat, i, j));
+	}
+	comatrix.len = len;
+	return (comatrix);
+}
+
+t_mat	mat_scale(t_mat mat, double scalar)
+{
+	t_mat	ret;
+	int		i;
+	int		j;
+	int		len;
+
+	len = mat.len;
+	i = -1;
+	while (++i < len)
+	{
+		j = -1;
+		while (++j < len)
+			ret.arr[i][j] = mat.arr[i][j] / scalar;
+	}
+	ret.len = len;
+	return (ret);
+}
+
+t_mat	mat_inverse(t_mat mat) // this function is used only for rotation transformation matrices. they are always invertible so there is no need to calculate their determinatn.
+{
+	return (mat_scale(mat_transpose(mat_comatrix(mat)), mat_determinant(mat)));
+}
+
+t_vec4	mat_mul_vec4(t_mat mat, t_vec4 v)
+{
+	return ((t_vec4){vec4_dot(arr_to_vec4(mat.arr[0]), v),
+		vec4_dot(arr_to_vec4(mat.arr[1]), v),
+		vec4_dot(arr_to_vec4(mat.arr[2]), v),
+		vec4_dot(arr_to_vec4(mat.arr[3]), v)});
+}
+
+t_mat	mat_mul(t_mat mat1, t_mat mat2)
+{
+	t_mat	ret;
+	int		i;
+	int		j;
+	
+	i = -1;
+	while (++i < 4)
+	{
+		j = -1;
+		while (++j < 4)
+			ret.arr[i][j] = vec4_dot(arr_to_vec4(mat1.arr[i]),
+				(t_vec4){mat2.arr[0][j], mat2.arr[1][j],
+					mat2.arr[2][j], mat2.arr[3][j]});
+	}
+	ret.len = 4;
+	return (ret);
+}
+
+t_mat	mat_rx(double cosine, double sine)
+{
+	return ((t_mat){{
+		{1, 0, 0, 0},
+		{0, cosine, -sine, 0},
+		{0, sine, cosine, 0},
+		{0, 0, 0, 1}}, 4});
+}
+
+t_mat	mat_ry(double cosine, double sine)
+{
+	return ((t_mat){{
+		{cosine, 0, sine, 0},
+		{0, 1, 0, 0},
+		{-sine, 0, cosine, 0},
+		{0, 0, 0, 1}}, 4});	
+}
+
+t_mat	mat_rz(double cosine, double sine)
+{
+	return ((t_mat){{
+		{cosine, -sine, 0, 0},
+		{sine, cosine, 0, 0},
+		{0, 0, 1, 0},
+		{0, 0, 0, 1}}, 4});
+}
+
+t_mat	get_rx_to_z(t_vec forward)
+{
+	double	len_yz_proj;
+	double	cosine;
+	double	sine;
+	t_mat	mat_arr[4];
+
+	// if (fabs(fabs(forward.x) - 1) < 1e-6)
+	// 	return (mat_rx(cos(M_PI / 2), forward.x * sin(M_PI / 2)));
+	len_yz_proj = sqrt(pow(forward.y, 2) + pow(forward.z, 2));
+// you need below if-statement because cosine-sine logic is not work if forward is on x-axis.
+	if (len_yz_proj < 1e-6) // this means forward is on x axis.
+		return (mat_rx(cos(M_PI / 2), forward.x * sin(M_PI / 2)));
+	cosine = fabs(forward.z) / len_yz_proj;
+	sine = fabs(forward.y) / len_yz_proj;
+	mat_arr[0] = mat_rx(cosine, sine);		// 1사분면
+	mat_arr[1] = mat_rx(cosine, -sine);		// 2사분면
+	mat_arr[3] = mat_arr[1];				// 3사분면
+	mat_arr[2] = mat_arr[0];				// 4사분면
+	return (mat_arr[(fabs(forward.y) > 1e-6 && forward.y < 0)
+		+ 2 * (fabs(forward.z) > 1e-6 && forward.z < 0)]);
+}
+
+t_mat	get_ry_to_z(t_vec forward)	// 이미 rx로 회전해서 xz 평면상에 존재하는 백터에 대해 동작.
+{
+	double	cosine;
+	double	sine;
+	t_mat	mat_arr[4];
+
+	cosine = fabs(forward.z);
+	sine = fabs(forward.x);
+	mat_arr[0] = mat_ry(cosine, -sine);		// 1사분면
+	mat_arr[1] = mat_ry(cosine, sine);		// 2사분면
+	mat_arr[3] = mat_arr[1];				// 3사분면
+	mat_arr[2] = mat_arr[0];				// 4사분면
+	return (mat_arr[(fabs(forward.x) > 1e-6 && forward.x < 0)
+		+ 2 * (fabs(forward.z) > 1e-6 && forward.z < 0)]);
+}
+
+t_mat	mat_translation(double dx, double dy, double dz)
+{
+	return ((t_mat){{
+		{1, 0, 0, dx},
+		{0, 1, 0, dy},
+		{0, 0, 1, dz},
+		{0, 0, 0, 1}}, 4});
+}
+
+t_vec	rotate_normal(t_vec vec, t_mat op) // forward를 z축으로 변환 후 op 적용하고 다시 원래의 vec으로 변환
+{
+	t_mat	rx;
+	t_mat	ry;
+	t_vec4	res;
+
+	rx = get_rx_to_z(vec);
+	res = mat_mul_vec4(rx, vec_to_vec4(vec));
+	ry = get_ry_to_z(vec4_to_vec(res));
+	res = mat_mul_vec4(ry, res);
+	res = mat_mul_vec4(op, res);
+	res = mat_mul_vec4(mat_transpose(ry), res);
+	res = mat_mul_vec4(mat_transpose(rx), res);
+	return (vec4_to_vec(res));
+}
+
+/***************************************************************************/
 
 double	choose_smaller_t(double current, double candidate, int condition)
 {
@@ -1035,21 +1346,21 @@ t_rgb	mult_rgb_vec(t_rgb rgb, t_vec vec)
 		(int)(vec.y * rgb.g), (int)(vec.z * rgb.b)});
 }
 
-t_vec	compute_diffuse(t_vec inter, t_vec n, t_world world)
+t_vec	compute_diffuse(t_vec inter, t_vec n, t_light light)
 {
 	t_vec	ret;
 	t_vec	l;
 	double	n_dot_l;
 
 	ret = (t_vec){0, 0, 0};
-	l = vec_normalize(vec_sub(world.l.coord, inter));
+	l = vec_normalize(vec_sub(light.coord, inter));
 	n_dot_l = vec_dot(n, l);
 	if (n_dot_l > 0)
-		ret = vec_scale(rgb_to_vec(world.l.rgb), world.l.intensity * n_dot_l);
+		ret = vec_scale(rgb_to_vec(light.rgb), light.intensity * n_dot_l);
 	return (ret);
 }
 
-t_vec	compute_specular(t_vec inter, t_vec n, t_vec v, t_world world)
+t_vec	compute_specular(t_vec inter, t_vec n, t_vec v, t_light light)
 {
 	t_vec	ret;
 	t_vec	l;
@@ -1057,13 +1368,13 @@ t_vec	compute_specular(t_vec inter, t_vec n, t_vec v, t_world world)
 	double	r_dot_v;
 
 	ret = (t_vec){0, 0, 0};
-	l = vec_normalize(vec_sub(world.l.coord, inter));
+	l = vec_normalize(vec_sub(light.coord, inter));
 	r = vec_sub(vec_neg(l), vec_scale(n, 2.0 * vec_dot(n, vec_neg(l))));
 	r_dot_v = vec_dot(v, r);
 	if (r_dot_v > 0)
-		ret = vec_scale(rgb_to_vec(world.l.rgb),
-			world.l.intensity * pow(r_dot_v, S_EXP));
-    return (ret);
+		ret = vec_scale(rgb_to_vec(light.rgb), \
+			light.intensity * pow(r_dot_v, S_EXP));
+	return (ret);
 }
 
 t_vec	compute_lighting(t_vec inter, t_vec n, t_vec v, t_world world) // only for diffuse reflection, p_norm should be an unit vector
@@ -1072,16 +1383,22 @@ t_vec	compute_lighting(t_vec inter, t_vec n, t_vec v, t_world world) // only for
 	t_vec	v_diffuse;
 	t_vec	v_specular;
 	t_vec	lighting;
+	t_node	*l;
 
-	v_ambient = vec_scale(rgb_to_vec(world.l.rgb), world.a.intensity);
-	if (check_shadow(world, get_l_ray(world.l, inter)))
-		lighting = v_ambient;
-	else
-	{
-		v_diffuse = compute_diffuse(inter, n , world);
-		v_specular = compute_specular(inter, n, v, world);
-		lighting = vec_add(vec_add(v_ambient, v_diffuse), v_specular);
+	l = world.l;
+	v_ambient = vec_scale(rgb_to_vec(world.a.rgb), world.a.intensity);
+	v_diffuse = (t_vec){0, 0, 0};
+	v_specular = (t_vec){0, 0, 0};
+	while (l)
+	{	
+		if (!check_shadow(world, get_l_ray(*(t_light *)l->data, inter)))
+		{
+			v_diffuse = vec_add(v_diffuse, compute_diffuse(inter, n, *(t_light *)l->data));
+			v_specular = vec_add(v_specular, compute_specular(inter, n, v, *(t_light *)l->data));
+		}
+		l = l->next;
 	}
+	lighting = vec_add(vec_add(v_ambient, v_diffuse), v_specular);
 	lighting.x -= (lighting.x > 1.0) * (lighting.x - 1.0);
 	lighting.y -= (lighting.y > 1.0) * (lighting.y - 1.0);
 	lighting.z -= (lighting.z > 1.0) * (lighting.z - 1.0);
@@ -1218,7 +1535,7 @@ int	read_file(int fd, t_world *world)
 	return (1);
 }
 
-t_vec	get_basis_vec(t_vec v)
+t_vec	get_basis_vec(t_vec v) // replace this function's content with <rotation_to_z>_<operation>_<inverse_from_z>.
 {
 	t_vec	bx;
 	t_vec	by;
@@ -1234,38 +1551,61 @@ t_vec	get_basis_vec(t_vec v)
 	return (by);
 }
 
-void	get_pixel_info(t_camera c, t_p_info *p_info)
+t_vec	get_viewport_vec(t_camera c, t_vec4 axis)
 {
-	t_vec	h;
-	t_vec	v;
-	t_vec	tmp;
+	return (vec4_to_vec(mat_mul_vec4(
+		mat_mul(rotate_longitude(c.longi), rotate_latitude(c.lati)),
+		axis)));
+}
+
+// void	make_viewport(t_camera c, t_vec *h, t_vec *v)
+// {
+// 	// this method doesn't make sense.
+// 	// t_mat	rx;
+// 	// t_mat	ry;
+// 	// t_mat	inv;
+// 	// t_vec4	rotated;
+
+// 	// rx = get_rx_to_z(c.norm);
+// 	// rotated = mat_mul_vec4(rx, vec_to_vec4(c.norm));
+// 	// ry = get_ry_to_z(vec4_to_vec(rotated));
+// 	// rotated = mat_mul_vec4(ry, rotated);
+// 	// inv = mat_mul(mat_transpose(rx), mat_transpose(ry));
+// 	// *h = vec4_to_vec(mat_mul_vec4(inv, (t_vec4){0, -1, 0, 1}));
+// 	// *v = vec4_to_vec(mat_mul_vec4(inv, (t_vec4){1, 0, 0, 1}));
+// }
+
+t_viewport	generate_viewport(t_camera c)
+{
+	t_vec	v_w;
+	t_vec	v_h;
+	t_vec	top_left;
 	double	vp_h;
 	double	vp_w;
 
 	vp_w = tan((c.fov * M_PI / 180.0) / 2.0) * 2;
-	vp_h = vp_w * ((double)P_HEI / (double)P_WID);
-	h = vec_cross(c.norm, get_viewport_vec(c.norm));
-	v = vec_cross(c.norm, h);
-	h = vec_scale(h, (double)1 / vec_len(h) * (vp_w / (double)P_WID));
-	v = vec_scale(v, (double)1 / vec_len(v) * (vp_h / (double)P_HEI));
-	p_info->p_h = h;
-	p_info->p_v = v;
-	tmp = vec_add(c.coord, c.norm);
-	tmp = vec_sub(tmp, vec_scale(h, (double)P_WID / (double)2));
-	tmp = vec_sub(tmp, vec_scale(v, (double)P_HEI / (double)2));
-	p_info->top_left = tmp;
+	vp_h = vp_w * HEIGHT / WIDTH;
+	// v_w = vec_cross(c.norm, get_viewport_vec(c.norm));
+	// v_h = vec_cross(c.norm, v_w);
+	// make_viewport(c, &v_w, &v_h);
+	v_w = vec_scale(get_viewport_vec(c, (t_vec4){0, -1, 0, 1}), vp_w / WIDTH);
+	v_h = vec_scale(get_viewport_vec(c, (t_vec4){1, 0, 0, 1}), vp_h / HEIGHT);
+	top_left = vec_add(c.coord, c.norm);
+	top_left = vec_sub(top_left, vec_scale(v_w, WIDTH / 2.0));
+	top_left = vec_sub(top_left, vec_scale(v_h, HEIGHT / 2.0));
+	return ((t_viewport){top_left, v_w, v_h});
 }
 
 /////////////////////////////////////////////////////
-t_ray	generate_ray(t_coord pos, t_p_info p_info, int i, int j)
+t_ray	generate_ray(t_coord pos, t_viewport viewport, int i, int j)
 {
 	t_ray	ret;
 	t_coord	tmp;
 
 	ret.pos = pos;
-	tmp = p_info.top_left;
-	tmp = vec_add(tmp, vec_scale(p_info.p_h, i));
-	tmp = vec_add(tmp, vec_scale(p_info.p_v, j));
+	tmp = viewport.top_left;
+	tmp = vec_add(tmp, vec_scale(viewport.v_width, i));
+	tmp = vec_add(tmp, vec_scale(viewport.v_height, j));
 	ret.dir = vec_sub(tmp, pos);
 	return (ret);
 }
@@ -1273,7 +1613,7 @@ t_ray	generate_ray(t_coord pos, t_p_info p_info, int i, int j)
 t_rgb	get_img_rgb(t_img img, t_uv uv)
 {
 	int	i;
-
+  
 	i = img.width * uv.u + ((int)(img.height * uv.v)) * img.width;
 	i *= 4;
 	return ((t_rgb){(unsigned char)img.addr[i + 2], \
@@ -1387,6 +1727,20 @@ t_rgb	get_obj_rgb(t_vars *vars, t_obj obj, t_coord p, t_vec lighting)
 		get_cy_rgb, get_pl_rgb, get_cn_rgb};
 
 	ret = (*fp[obj.type - 1])(vars->b_img, obj.object, p);
+	(void)p; //
+	ret = (t_rgb){0, 0, 0};
+	if (obj.type == SPHERE)
+		// ret = ((t_sp *)obj.object)->rgb;
+		ret = uv_pattern_at(uv_map_sphere(p, *((t_sp *)obj.object)), 16, 8);
+	else if (obj.type == PLANE)
+		// ret = ((t_pl *)obj.object)->rgb;
+		ret = uv_pattern_at(uv_map_plane(p, *((t_pl *)obj.object)), 16, 16);
+	else if (obj.type == CYLINDER)
+		ret = ((t_cy *)obj.object)->rgb;
+		// ret = uv_pattern_at(uv_map_cylinder(p, *((t_cy *)obj.object)), 16, 8);
+	else if (obj.type == CONE)
+		ret = ((t_cn *)obj.object)->rgb;
+		// ret = uv_pattern_at(uv_map_cone(p, *((t_cn *)obj.object)), 16, 8);
 	return (mult_rgb_vec(ret, lighting));
 }
 
@@ -1533,18 +1887,21 @@ int	trace_ray(t_vars *vars, t_world *world, t_ray ray, int i)
 	t_vec	n;
 
 	if (!intersect(ray, *world, &obj))
-		return (0);
-	//background color
-	p = vec_add(ray.pos, vec_scale(ray.dir, obj.t));
-	n = get_tangent_norm(obj, p, ray.dir);
-	if (get_status(obj.type, obj.object) & BUMP)
-		n = get_bump_norm(&vars->b_img, obj, p, n);
-	color = get_obj_rgb(vars, obj, p,
-		compute_lighting(p, n, vec_neg(vec_normalize(ray.dir)), *world));
+    color = (t_rgb){0, 0, 0}; //background color
+  else
+  {
+  	p = vec_add(ray.pos, vec_scale(ray.dir, obj.t));
+	  n = get_tangent_norm(obj, p, ray.dir);
+	  if (get_status(obj.type, obj.object) & BUMP)
+	  	n = get_bump_norm(&vars->b_img, obj, p, n);
+	  color = get_obj_rgb(vars, obj, p,
+	  	compute_lighting(p, n, vec_neg(vec_normalize(ray.dir)), *world));
+  }
 	dot_pixel(&vars->img, color, i);
 	return (0);
 }
 /////////////////////////////////////////////////////
+
 
 t_vec	vec_translate(t_vec v, double dx, double dy, double dz)
 {
@@ -1571,22 +1928,22 @@ t_vec	vec_rotate_h(t_vec forward)
 	return (vec_add(vec_scale(forward, cos(R_RAD)), vec_scale(right, sin(R_RAD))));
 }
 
-void	*drawing(void *b_pram)
+void	*drawing(void *b_param)
 {
-	t_thread_pram	pram;
+	t_thread_param	param;
 	t_ray			ray;
 	int				i;
 	int				j;
 
-	pram = *(t_thread_pram *)b_pram;
-	j = pram.index * (P_HEI / THREAD) - 1;
-	while (++j < (pram.index + 1) * (P_HEI / THREAD))
+	param = *(t_thread_param *)b_param;
+	j = param.index * (P_HEI / THREAD) - 1;
+	while (++j < (param.index + 1) * (P_HEI / THREAD))
 	{
 		i = -1;
-		while (++i < P_WID)
+		while (++i < WIDTH)
 		{
-			ray = generate_ray(pram.world->c.coord, pram.p_info, i, j);
-			trace_ray(pram.vars, pram.world, ray, j * P_WID + i);
+			ray = generate_ray(param.world->c.coord, param.p_info, i, j);
+			trace_ray(param.vars, param.world, ray, j * P_WID + i);
 		}
 	}
 	return (0);
@@ -1594,13 +1951,17 @@ void	*drawing(void *b_pram)
 
 int draw_img(t_thread_pram *param)
 {
-	t_p_info	p_info;
-	t_vars		*vars;
+	t_viewport	viewport;
+  t_vars		*vars;
 	void		*tmp;
 	int			i;
-
+/////////////////////// key_press_handler doesn't change world's value.
+	// t_camera c = world->c;
+	// print_vector("normal: ", c.norm);
+	// print_vector("coordinate: ", c.coord);
+///////////////////////
 	vars = param->vars;
-	get_pixel_info(param->world->c, &p_info);
+	viewport = generate_viewport(vars->world.c);
 	i = -1;
 	while (++i < THREAD)
 	{
@@ -1616,12 +1977,12 @@ int draw_img(t_thread_pram *param)
 }
 
 
-int	create_thread_pram(t_world *world, t_vars *vars, t_thread_pram **pram)
+int	create_thread_param(t_world *world, t_vars *vars, t_thread_param **param)
 {
-	t_thread_pram	*ret;
+	t_thread_param	*ret;
 	int				i;
 
-	ret = (t_thread_pram *)malloc(sizeof(t_thread_pram) * THREAD);
+	ret = (t_thread_param *)malloc(sizeof(t_thread_param) * THREAD);
 	if (ret == NULL)
 		return (0);
 	i = -1;
@@ -1631,30 +1992,16 @@ int	create_thread_pram(t_world *world, t_vars *vars, t_thread_pram **pram)
 		ret[i].world = world;
 		ret[i].index = i;
 	}
-	*pram = ret;
+	*param = ret;
 	return (1);
 }
 
-void	rotate_object(t_obj obj, int keycode)
+t_mat	rotate_latitude(int angle)
 {
-	int			type;
-	t_vec		rotated;
-	t_obj_info	*info;
+	double	rad;
 
-	type = obj.type;
-	if (type == CYLINDER || type == PLANE || type == CONE || type == CAMERA)
-	{
-		info = (t_obj_info *)(obj.object);
-		printf("info normal : <%f, %f, %f>\n", info->norm.x, info->norm.y, info->norm.z);
-		printf("obj  normal : <%f, %f, %f>\n", ((t_cy *)(obj.object))->norm.x, ((t_cy *)(obj.object))->norm.y, ((t_cy *)(obj.object))->norm.z);
-		if (keycode == Q)
-			rotated = vec_rotate_v(info->norm);
-		else
-			rotated = vec_rotate_h(info->norm);
-		info->norm = rotated;
-		printf("info normal : <%f, %f, %f>\n", info->norm.x, info->norm.y, info->norm.z);
-		printf("obj  normal : <%f, %f, %f>\n", ((t_cy *)(obj.object))->norm.x, ((t_cy *)(obj.object))->norm.y, ((t_cy *)(obj.object))->norm.z);
-	}
+	rad = angle * M_PI / 180;
+	return (mat_rx(cos(rad), sin(rad)));
 }
 
 int	*get_p_status(int type, void *object)
@@ -1701,79 +2048,144 @@ void	apply_img(t_obj obj)
 		*status += IMAGE;
 }
 
-int	key_press_handler(int keycode, t_thread_pram *param)
+t_mat	rotate_longitude(int angle)
+{
+	double	rad;
+
+	rad = angle * M_PI / 180;
+	return (mat_ry(cos(rad), sin(rad)));
+}
+
+void	rotate_object(t_obj obj, int keycode)
+{
+	t_obj_info	*current_object;
+	int			latitude;
+	int			longitude;
+
+	current_object = (t_obj_info *)(obj.object);
+	latitude = current_object->lati;
+	longitude = current_object->longi;
+	latitude += (keycode == ONE) * ANGLE + (keycode == TWO) * -ANGLE;
+	latitude %= 360;
+	longitude += (keycode == THREE) * ANGLE + (keycode == FOUR) * -ANGLE;
+	longitude %= 360;
+	current_object->lati = latitude;
+	current_object->longi = longitude;
+	current_object->norm = rotate_normal(
+		current_object->norm_const,
+		mat_mul(rotate_longitude(longitude), rotate_latitude(latitude)));
+}
+
+void	translate_object(t_obj obj, int keycode)
+{
+	// t_obj_info	*current_object;
+	// t_vec4		translated;
+
+	// current_object = (t_obj_info *)(obj.object);
+	// translated = mat_mul_vec4(
+	// 	mat_translation(
+	// 		(keycode == W) - (keycode == S),
+	// 		(keycode == D) - (keycode == A),
+	// 		(keycode == E) - (keycode == Q)),
+	// 	vec_to_vec4(current_object->coord));
+	// current_object->coord = (t_vec){translated.x, translated.y, translated.z};
+	t_obj_info	*current_object;
+	t_coord		translated;
+
+	current_object = (t_obj_info *)(obj.object);
+	translated = current_object->coord;
+	translated = (t_vec){
+		translated.x + (keycode == W) - (keycode == S),
+		translated.y + (keycode == D) - (keycode == A),
+		translated.z + (keycode == E) - (keycode == Q)
+	};
+	current_object->coord = translated;
+}
+
+int	key_press_handler(int code, t_thread_pram *param)
 {
 	t_vars	*vars;
 
+	// (void)vars;
+	// printf("%d\n", code);
 	vars = param->vars;
-	printf("type is %d\n", vars->obj.type);
-	printf("keycode is %d\n", keycode);
 	if (vars->obj.type == NONE)
 		return (0);
-	if (keycode == Q || keycode == E)
-		rotate_object(vars->obj, keycode);
-	if (keycode == C)
+	if (code == ONE || code == TWO || code == THREE || code == FOUR)
+		rotate_object(vars->obj, code);
+	else if (code == W || code == A || code == S || code == D
+		|| code == Q || code == E)
+		translate_object(vars->obj, code);
+	else if (code == K) {
+		vars->obj.type = CAMERA;
+		vars->obj.object = &(vars->world.c);
+	}
+  else if (code == C)
 		apply_checker(vars->obj);
-	if (keycode == B)
+	else if (code == B)
 		apply_bump(vars->obj);
-	if (keycode == I)
+	else if (code == I)
 		apply_img(vars->obj);
-	// else if (keycode == W || keycode == A || keycode == D || keycode == D)
-		// WASD should be one of the parameters of the function going to be called here.
-	draw_img(param);
+	draw_img(vars);
 	return (0);
 }
 
-// int	main(void) //keycode tester
-// {
-// 	t_vars		vars;
+int	mouse_handler(int button, int x, int y, t_vars *vars)
+{
+	t_ray		ray;
+	t_camera	c;
 
-// 	init_mlx_pointers(&vars);
-// 	mlx_key_hook(vars.win, key_press_handler, &vars);
-// 	mlx_loop(vars.mlx);
-// }
+	if (MOUSE_LEFT != button)
+		return (0);
+	c = vars->world.c;
+	ray = generate_ray(c.coord, generate_viewport(c), x, y);
+	if (!intersect(ray, vars->world, &(vars->obj)))
+		return (0);
+	return (0);
+}
 
 int	main(int argc, char **argv)
 {
 	int				fd;
-	t_world			world;
 	t_vars			vars;
-	t_thread_pram	*pram;
+	t_world			*world;
+	t_thread_param	*param;
 
 	if (argc != 2)
 		return (0); // call error handling function with proper error message.
 	fd = open_file(argv[1]);
 	if (fd < 0) // remove this when error handling function is completed.
 		return (0); // 에러 문자열 출력하고 처리해주기
-	world.sp = 0;
-	world.pl = 0;
-	world.cy = 0;
-	world.cn = 0;
-	pram = NULL;
-	if (read_file(fd, &world))
+	world = &(vars.world);
+	world->sp = 0;
+	world->pl = 0;
+	world->cy = 0;
+	world->cn = 0;
+	if (read_file(fd, world))
 	{
 		init_mlx_pointers(&vars);
 		printf("%s\n", "valid format");
-		if (!create_thread_pram(&world, &vars, &pram))
+		if (!create_thread_param(&world, &vars, &param))
 		{
 			//free
 			return (1);
 		}
-		if (!draw_img(pram))
+		if (!draw_img(param))
 		{
 			//free
 			return (1);
 		}
-		vars.obj.type = CYLINDER;
-		vars.obj.object = world.cy->data;
-		mlx_key_hook(vars.win, key_press_handler, pram);
+		vars.obj.type = CAMERA;
+		vars.obj.object = &(world->c);//world->pl->data; 
+		mlx_key_hook(vars.win, key_press_handler, param);
+		mlx_mouse_hook(vars.win, mouse_handler, param);
 		mlx_loop(vars.mlx);
 	}
 	else
 		printf("%s\n", "invalid format");
-	clear_list(&(world.sp));
-	clear_list(&(world.pl));
-	clear_list(&(world.cy));
-	clear_list(&(world.cn));
+	clear_list(&(world->sp));
+	clear_list(&(world->pl));
+	clear_list(&(world->cy));
+	clear_list(&(world->cn));
 	return (0);
 }
