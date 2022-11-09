@@ -29,18 +29,19 @@
 
 #define	MOUSE_LEFT	1
 
-#define W			119 // linux 119,  mac 13 move up
-#define A			97  // linux 97, mac 0  move left
-#define S			115 // linux 115, mac 1  move down
-#define D			100 // linux 100, mac 2  move right
-#define Q			113 // linux 113, mac 12 move forward
-#define E			101 // linux 101, mac 14 move backward
+#define W			13 // linux 119,  mac 13 move up
+#define A			0  // linux 97, mac 0  move left
+#define S			1 // linux 115, mac 1  move down
+#define D			2 // linux 100, mac 2  move right
+#define Q			12 // linux 113, mac 12 move forward
+#define E			14 // linux 101, mac 14 move backward
 
-#define ONE			49 // linux 49, mac 18 rotate forward
-#define TWO			50 // linux 50, mac 19 rotate backward
-#define THREE		51 // linux 51, mac 20 choose rotate circle forward
-#define FOUR		52 // linux 52, mac 21 choose rotate circle backward
+#define ONE			18 // linux 49, mac 18 rotate forward
+#define TWO			19 // linux 50, mac 19 rotate backward
+#define THREE		20 // linux 51, mac 20 choose rotate circle forward
+#define FOUR		21 // linux 52, mac 21 choose rotate circle backward
 
+#define K			40 // linux , mac 40 select camera
 #define Z			6  // linux 122, mac 6  move forward
 #define X			7  // linux 120, mac 7  move back
 //#define	INFINITY	1e500
@@ -1781,6 +1782,10 @@ int	key_press_handler(int code, t_vars *vars)
 	else if (code == W || code == A || code == S || code == D
 		|| code == Q || code == E)
 		translate_object(vars->obj, code);
+	else if (code == K) {
+		vars->obj.type = CAMERA;
+		vars->obj.object = &(vars->world.c);
+	}
 	draw_img(vars);
 	return (0);
 }
