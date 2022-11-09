@@ -22,6 +22,14 @@
 #define UP			126
 #define RIGHT		124
 #define DOWN		125
+
+#define BUMP_HIGHT_WEIGHT	100
+#define BUMP_IMG	"bump.png"
+
+#define CHECKER		1
+#define IMAGE		2
+#define BUMP		4
+
 #define WIDTH 		1280
 #define HEIGHT		720
 #define THREAD		12
@@ -41,6 +49,10 @@
 #define THREE		20 // linux 51, mac 20 choose rotate circle forward
 #define FOUR		21 // linux 52, mac 21 choose rotate circle backward
 
+#define C			8 // linux
+#define B			11 // linux
+#define I			34 // linux
+
 #define K			40 // linux , mac 40 select camera
 #define Z			6  // linux 122, mac 6  move forward
 #define X			7  // linux 120, mac 7  move back
@@ -55,6 +67,8 @@ typedef struct s_img
 	int		bits_per_pixel;
 	int		line_length;
 	int		endian;
+	int		width;
+	int		height;
 }	t_img;
 
 typedef struct s_obj
@@ -117,6 +131,7 @@ typedef struct s_sphere
 	t_coord	coord;
 	double	diameter;
 	t_rgb	rgb;
+	int		status;
 }	t_sp;
 
 typedef struct s_plane
@@ -127,6 +142,7 @@ typedef struct s_plane
 	int		longi;
 	t_vec	norm_const;
 	t_rgb	rgb;
+	int		status;
 }	t_pl;
 
 typedef struct s_cylinder
@@ -139,6 +155,7 @@ typedef struct s_cylinder
 	double	diameter;
 	double	height;
 	t_rgb	rgb;
+	int		status;
 }	t_cy;
 
 typedef t_cy	t_cn;
@@ -172,12 +189,6 @@ typedef struct s_intersection
 	double	r;
 }	t_inter;
 
-// typedef struct s_circle
-// {
-// 	t_coord	center;
-// 	double	radius;
-// }	t_circle;
-
 typedef struct s_equation
 {
 	double	a;
@@ -208,24 +219,23 @@ typedef struct s_viewport
 	t_vec	v_height;
 }	t_viewport;
 
-typedef struct s_thread_param
-{
-	t_img		*img;
-	t_world		*world;
-	t_viewport	viewport;
-	int			index;
-	pthread_t	thread_id;
-}	t_thread_param;
-
 typedef struct s_vars
 {
 	void		*mlx;
 	void		*win;
 	t_img		img;
+	t_img		b_img;
 	t_obj		obj;
-	t_world		world;
-	t_thread_param *param;
 }	t_vars;
+
+typedef struct s_thread_param
+{
+	t_vars		*vars;
+	t_world		*world;
+	t_p_info	p_info;
+	int			index;
+	pthread_t	thread_id;
+}	t_thread_param;
 
 t_mat	rotate_latitude(int);
 t_mat	rotate_longitude(int);
@@ -240,6 +250,30 @@ int	check_rgb(t_rgb rgb)
 	g = rgb.g;
 	b = rgb.b;
 	return (-1 < r && r < 256 && -1 < g && g < 256 && -1 < b && b < 256);
+}
+
+void	convert_color_to_grayscale(t_img *img)
+{
+	int				i;
+	int				j;
+	unsigned char	color;
+	int				pixel;
+
+	j = -1;
+	while (++j < img->height)
+	{
+		i = -1;
+		while (++i < img->width)
+		{
+			pixel = (i + j * img->width) * 4;
+			color = 0.11 * (unsigned char)img->addr[pixel] + \
+			0.59 * (unsigned char)img->addr[pixel + 1] + \
+			0.3 * (unsigned char)img->addr[pixel + 2];
+			img->addr[pixel] = color;
+			img->addr[pixel + 1] = color;
+			img->addr[pixel + 2] = color;
+		}
+	}
 }
 
 int	init_mlx_pointers(t_vars *vars)
@@ -257,6 +291,15 @@ int	init_mlx_pointers(t_vars *vars)
 			&vars->img.line_length, &vars->img.endian);
 	if (!vars->img.addr)
 		return (0);
+	vars->b_img.ptr = mlx_png_file_to_image(vars->mlx, BUMP_IMG, \
+					&vars->b_img.width, &vars->b_img.height);
+	if (!vars->b_img.ptr)
+		return (0);
+	vars->b_img.addr = mlx_get_data_addr(vars->b_img.ptr, \
+	&vars->b_img.bits_per_pixel, &vars->b_img.line_length, &vars->b_img.endian);
+	if (!vars->b_img.addr)
+		return (0);
+	convert_color_to_grayscale(&vars->b_img);
 	vars->obj.type = NONE;
 	vars->obj.object = 0;
 	vars->obj.t = 0;
@@ -398,6 +441,7 @@ int	set_plane(char **info, int cnt, t_world *world)
 		return (0);
 	if (!set_rgb(info[3], &(pl->rgb)))
 		return (0);
+	pl->status = 0;
 	pl->longi = 0;
 	pl->lati = 0;
 	pl->norm_const = pl->norm;
@@ -419,6 +463,7 @@ int	set_sphere(char **info, int cnt, t_world *world)
 	if (!set_rgb(info[3], &(sp->rgb)))
 		return (0);
 	sp->diameter = diameter;
+	sp->status = 0;
 	return (1);
 }
 
@@ -447,6 +492,7 @@ int	set_cylinder(char **info, int cnt, t_world *world)
 	cy->norm_const = cy->norm;
 	cy->diameter = diameter;
 	cy->height = height;
+	cy->status = 0;
 	return (1);
 }
 
@@ -475,6 +521,7 @@ int	set_cone(char **info, int cnt, t_world *world)
 	cn->norm_const = cn->norm;	
 	cn->diameter = diameter;
 	cn->height = height;
+	cn->status = 0;
 	return (1);
 }
 
@@ -1358,10 +1405,19 @@ t_vec	compute_lighting(t_vec inter, t_vec n, t_vec v, t_world world) // only for
 	return (lighting);
 }
 
+t_vec	get_viewport_vec(t_vec v)
+{
+	if (vec_len(vec_cross(v, (t_vec){0, 0, 1})) < 1e-6)
+		return ((t_vec){1, 0, 0});
+	return ((t_vec){0, 0, 1});
+}
+
 typedef struct s_uv
 {
 	double	u;
 	double	v;
+	t_vec	pu;
+	t_vec	pv;
 }	t_uv;
 
 // u increases from 0 to 1 as you move counter-clockwise around the sphere
@@ -1373,7 +1429,9 @@ t_uv	uv_map_sphere(t_coord p, t_sp sp)
 
 	vec = vec_normalize(vec_sub(p, sp.coord));
 	uv.u = 0.5 + atan2(vec.x, vec.y) / (2 * M_PI);
-	uv.v = 0.5 + asin(vec.z) / M_PI;
+	uv.v = 0.5 - asin(vec.z) / M_PI;
+	uv.pu = vec_normalize(vec_cross(vec, get_viewport_vec(vec)));
+	uv.pv = vec_normalize(vec_cross(vec, uv.pu));
 	return (uv);
 }
 
@@ -1385,36 +1443,62 @@ t_uv	uv_map_plane(t_coord p, t_pl pl)
 	e1 = vec_cross(pl.norm, get_basis_vec(pl.norm));
 	e2 = vec_cross(pl.norm, e1);
 	return ((t_uv){fabs(fmod(vec_dot(p, e1), 100)) / 100,
-		fabs(fmod(vec_dot(p, e2), 100)) / 100});
-	// return ((t_uv){vec_dot(p, e1) / WIDTH, vec_dot(p, e2) / WIDTH});
+		fabs(fmod(vec_dot(p, e2), 100)) / 100,
+		vec_normalize(e1),
+		vec_normalize(e2)});
 }
 
 t_uv	uv_map_cylinder(t_coord p, t_cy cy)
 {
 	t_vec	e1;
 	t_vec	e2;
-	t_uv	ret;
+	t_uv	uv;
 	t_vec	c_p;
+	t_vec	n_p;
 
 	e1 = vec_cross(cy.norm, get_basis_vec(cy.norm));
 	e2 = vec_cross(cy.norm, e1);
 	c_p = vec_sub(p, cy.coord);
-	ret.u = 0.5 + atan2(vec_dot(c_p, e1), vec_dot(c_p, e2)) / (2 * M_PI);
-	ret.v = vec_len(vec_proj(vec_sub(p, cy.coord), cy.norm)) / cy.height;
-	return (ret);
+	uv.u = 0.5 + atan2(vec_dot(c_p, e1), vec_dot(c_p, e2)) / (2 * M_PI);
+	uv.v = vec_len(vec_proj(vec_sub(p, cy.coord), cy.norm)) / (cy.height + 1);
+	n_p = vec_normalize(vec_sub(p, vec_add(cy.coord, vec_proj(c_p, cy.norm))));
+	if (vec_dot(c_p, cy.norm))
+		n_p = cy.norm;
+	uv.pu = vec_normalize(vec_cross(n_p, get_viewport_vec(n_p)));
+	uv.pv = vec_normalize(vec_cross(n_p, uv.pu));
+	return (uv);
+}
+
+t_vec	get_cone_body_norm(t_coord p, t_cn cn)
+{
+	t_coord	x;
+	double	len_top_x;
+	double	theta;
+ 
+	theta = atan2(cn.diameter / 2, cn.height);
+	len_top_x = vec_len(vec_sub(p, vec_add(p, vec_scale(cn.norm, cn.height)))) / cos(theta);
+	x = vec_add(cn.coord, vec_scale(cn.norm, cn.height - len_top_x));
+	return (vec_normalize(vec_sub(p, x)));
 }
 
 t_uv	uv_map_cone(t_coord p, t_cn cn)
 {
-	return (uv_map_cylinder(p, (t_cy)cn));
+	t_uv	ret;
+	t_vec	n_p;
+
+	ret = uv_map_cylinder(p, (t_cy)cn);
+	n_p = get_cone_body_norm(p, cn);
+	ret.pu = vec_normalize(vec_cross(n_p, get_viewport_vec(n_p)));
+	ret.pv = vec_normalize(vec_cross(n_p, ret.pu));
+	return (ret);
 }
 
 // u, v are in [0, 1]
-t_rgb	uv_pattern_at(t_uv uv, int w, int h)
+char	uv_pattern_at(t_uv uv, int w, int h)
 {
 	if (((int)floor(uv.u * w) + (int)floor(uv.v * h)) % 2)
-		return ((t_rgb){0, 0, 255});
-	return ((t_rgb){255, 255, 255});
+		return (1);
+	return (0);
 }
 
 int	open_file(char *path)
@@ -1526,10 +1610,123 @@ t_ray	generate_ray(t_coord pos, t_viewport viewport, int i, int j)
 	return (ret);
 }
 
-t_rgb	get_obj_rgb(t_obj obj, t_coord p, t_vec lighting)
+t_rgb	get_img_rgb(t_img img, t_uv uv)
 {
-	t_rgb	ret;
+	int	i;
+  
+	i = img.width * uv.u + ((int)(img.height * uv.v)) * img.width;
+	i *= 4;
+	return ((t_rgb){(unsigned char)img.addr[i + 2], \
+		(unsigned char)img.addr[i + 1], (unsigned char)img.addr[i]});
+}
 
+t_rgb	get_sp_rgb(t_img img, void *object, t_coord p)
+{
+	t_uv	uv;
+	t_sp	*sp;
+
+	sp = object;
+	if ((sp->status & CHECKER))
+	{
+		uv = uv_map_sphere(p, *sp);
+		if (uv_pattern_at(uv, 16, 16))
+		{
+			if (sp->status & IMAGE)
+				return (get_img_rgb(img, uv));
+			return (sp->rgb);
+		}
+		return ((t_rgb){255, 255, 255});
+	}
+	if (sp->status & IMAGE)
+	{
+		uv = uv_map_sphere(p, *sp);
+		return (get_img_rgb(img, uv));
+	}
+	return (sp->rgb);
+}
+
+t_rgb	get_pl_rgb(t_img img, void *object, t_coord p)
+{
+	t_uv	uv;
+	t_pl	*pl;
+
+	pl = object;
+	if ((pl->status & CHECKER))
+	{
+		uv = uv_map_plane(p, *pl);
+		if (uv_pattern_at(uv, 16, 16))
+		{
+			if (pl->status & IMAGE)
+				return (get_img_rgb(img, uv));
+			return (pl->rgb);
+		}
+		return ((t_rgb){255, 255, 255});
+	}
+	if (pl->status & IMAGE)
+	{
+		uv = uv_map_plane(p, *pl);
+		return (get_img_rgb(img, uv));
+	}
+	return (pl->rgb);
+}
+
+t_rgb	get_cy_rgb(t_img img, void *object, t_coord p)
+{
+	t_uv	uv;
+	t_cy	*cy;
+
+	cy = object;
+	if ((cy->status & CHECKER))
+	{
+		uv = uv_map_cylinder(p, *cy);
+		if (uv_pattern_at(uv, 16, 8))
+		{
+			if (cy->status & IMAGE)
+				return (get_img_rgb(img, uv));
+			return (cy->rgb);
+		}
+		return ((t_rgb){255, 255, 255});
+	}
+	if (cy->status & IMAGE)
+	{
+		uv = uv_map_cylinder(p, *cy);
+		return (get_img_rgb(img, uv));
+	}
+	return (cy->rgb);
+}
+
+t_rgb	get_cn_rgb(t_img img, void *object, t_coord p)
+{
+	t_uv	uv;
+	t_cn	*cn;
+
+	cn = object;
+	if ((cn->status & CHECKER))
+	{
+		uv = uv_map_cone(p, *cn);
+		if (uv_pattern_at(uv, 16, 16))
+		{
+			if (cn->status & IMAGE)
+				return (get_img_rgb(img, uv));
+			return (cn->rgb);
+		}
+		return ((t_rgb){255, 255, 255});
+	}
+	if (cn->status & IMAGE)
+	{
+		uv = uv_map_cone(p, *cn);
+		return (get_img_rgb(img, uv));
+	}
+	return (cn->rgb);
+}
+
+t_rgb	get_obj_rgb(t_vars *vars, t_obj obj, t_coord p, t_vec lighting)
+{
+	t_rgb			ret;
+	static t_rgb	(*fp[4])(t_img, void *, t_coord) = {get_sp_rgb, \
+		get_cy_rgb, get_pl_rgb, get_cn_rgb};
+
+	ret = (*fp[obj.type - 1])(vars->b_img, obj.object, p);
 	(void)p; //
 	ret = (t_rgb){0, 0, 0};
 	if (obj.type == SPHERE)
@@ -1605,7 +1802,7 @@ t_vec	get_tangent_norm_cn(t_cn *cn, t_coord p, t_vec ray_dir)
 {
 	double	a;
 	double	b;
-	t_coord	t_c;
+	t_vec	ret;
 
 	a = vec_dot(p, cn->norm);
 	b = vec_dot(vec_add(cn->coord, vec_scale(cn->norm, cn->height)), cn->norm);
@@ -1622,10 +1819,10 @@ t_vec	get_tangent_norm_cn(t_cn *cn, t_coord p, t_vec ray_dir)
 			return (vec_scale(cn->norm, -1));
 		return (cn->norm);
 	}
-	t_c = vec_add(cn->coord, vec_scale(cn->norm, fabs(a - b)));
-	if (vec_dot(ray_dir, vec_sub(p, t_c)) > 0)
-		return (vec_normalize(vec_sub(t_c, p)));
-	return (vec_normalize(vec_sub(p, t_c)));
+	ret = get_cone_body_norm(p, *cn);
+	if (vec_dot(ray_dir, ret) > 0)
+		return (vec_scale(ret, -1));
+	return (ret);
 }
 
 t_vec	get_tangent_norm(t_obj	obj, t_coord p, t_vec ray_dir)
@@ -1644,7 +1841,45 @@ t_vec	get_tangent_norm(t_obj	obj, t_coord p, t_vec ray_dir)
 	return (n);
 }
 
-int	trace_ray(t_img *img, t_world *world, t_ray ray, int i)
+t_vec	get_bump_norm(t_img *b_img, t_obj obj, t_vec p, t_vec n)
+{
+	t_vec	ret;
+	t_uv	uv;
+	int		i;
+	double	bu;
+	double	bv;
+
+	ret = (t_vec){0, 0, 0};
+	if (obj.type == SPHERE)
+		uv = uv_map_sphere(p, *(t_sp *)obj.object);
+	else if (obj.type == CYLINDER)
+		uv = uv_map_cylinder(p, *(t_cy *)obj.object);
+	else if (obj.type == PLANE)
+		uv = uv_map_plane(p, *(t_pl *)obj.object);
+	else if (obj.type == CONE)
+		uv = uv_map_cone(p, *(t_cn *)obj.object);
+	i = b_img->width * uv.u + (int)(b_img->height * uv.v) * b_img->width;
+	bu = b_img->addr[i * 4] - b_img->addr[(i + 1) * 4];
+	bv = b_img->addr[i * 4] - b_img->addr[(b_img->width + i) * 4];
+	bu /= BUMP_HIGHT_WEIGHT;
+	bv /= BUMP_HIGHT_WEIGHT;
+	ret = vec_sub(vec_scale(vec_cross(n, uv.pv), bu), \
+			vec_scale(vec_cross(n, uv.pu), bv));
+	return (vec_normalize(vec_add(n, ret)));
+}
+
+int	get_status(int	type, void *object)
+{
+	if (type == SPHERE)
+		return ((t_sp *)object)->status;
+	if (type == CYLINDER)
+		return ((t_cy *)object)->status;
+	if (type == PLANE)
+		return ((t_pl *)object)->status;
+	return ((t_cn *)object)->status;
+}
+
+int	trace_ray(t_vars *vars, t_world *world, t_ray ray, int i)
 {
 	t_obj	obj;
 	t_rgb	color;
@@ -1652,15 +1887,17 @@ int	trace_ray(t_img *img, t_world *world, t_ray ray, int i)
 	t_vec	n;
 
 	if (!intersect(ray, *world, &obj))
-		color = (t_rgb){0, 0, 0}; //background color
-	else
-	{
-		p = vec_add(ray.pos, vec_scale(ray.dir, obj.t));
-		n = get_tangent_norm(obj, p, ray.dir);
-		color = get_obj_rgb(obj, p,
-			compute_lighting(p, n, vec_neg(vec_normalize(ray.dir)), *world));
-	}
-	dot_pixel(img, color, i);
+    color = (t_rgb){0, 0, 0}; //background color
+  else
+  {
+  	p = vec_add(ray.pos, vec_scale(ray.dir, obj.t));
+	  n = get_tangent_norm(obj, p, ray.dir);
+	  if (get_status(obj.type, obj.object) & BUMP)
+	  	n = get_bump_norm(&vars->b_img, obj, p, n);
+	  color = get_obj_rgb(vars, obj, p,
+	  	compute_lighting(p, n, vec_neg(vec_normalize(ray.dir)), *world));
+  }
+	dot_pixel(&vars->img, color, i);
 	return (0);
 }
 /////////////////////////////////////////////////////
@@ -1706,15 +1943,16 @@ void	*drawing(void *b_param)
 		while (++i < WIDTH)
 		{
 			ray = generate_ray(param.world->c.coord, param.p_info, i, j);
-			trace_ray(param.img, param.world, ray, j * P_WID + i);
+			trace_ray(param.vars, param.world, ray, j * P_WID + i);
 		}
 	}
 	return (0);
 }
 
-int draw_img(t_vars *vars)
+int draw_img(t_thread_pram *param)
 {
 	t_viewport	viewport;
+  t_vars		*vars;
 	void		*tmp;
 	int			i;
 /////////////////////// key_press_handler doesn't change world's value.
@@ -1722,17 +1960,18 @@ int draw_img(t_vars *vars)
 	// print_vector("normal: ", c.norm);
 	// print_vector("coordinate: ", c.coord);
 ///////////////////////
+	vars = param->vars;
 	viewport = generate_viewport(vars->world.c);
 	i = -1;
 	while (++i < THREAD)
 	{
-		vars->param[i].p_info = p_info;
-		if (pthread_create(&(vars->param[i].thread_id), NULL, drawing, vars->param + i))
+		param[i].p_info = p_info;
+		if (pthread_create(&(param[i].thread_id), NULL, drawing, param + i))
 			return (0);
 	}
 	i = -1;
 	while (++i < THREAD)
-		pthread_join(vars->param[i].thread_id, &tmp);
+		pthread_join(param[i].thread_id, &tmp);
 	mlx_put_image_to_window(vars->mlx, vars->win, vars->img.ptr, 0, 0);
 	return (1);
 }
@@ -1749,8 +1988,8 @@ int	create_thread_param(t_world *world, t_vars *vars, t_thread_param **param)
 	i = -1;
 	while (++i < THREAD)
 	{
-		ret[i].img = &vars->img;
-		ret[i].world = &(vars->world);
+		ret[i].vars = vars;
+		ret[i].world = world;
 		ret[i].index = i;
 	}
 	*param = ret;
@@ -1763,6 +2002,50 @@ t_mat	rotate_latitude(int angle)
 
 	rad = angle * M_PI / 180;
 	return (mat_rx(cos(rad), sin(rad)));
+}
+
+int	*get_p_status(int type, void *object)
+{
+	if (type == SPHERE)
+		return (&((t_sp *)object)->status);
+	if (type == CYLINDER)
+		return (&((t_cy *)object)->status);
+	if (type == PLANE)
+		return (&((t_pl *)object)->status);
+	return (&((t_cn *)object)->status);
+}
+
+void	apply_checker(t_obj obj)
+{
+	int	*status;
+
+	status = get_p_status(obj.type, obj.object);
+	if (*status & CHECKER)
+		*status -= CHECKER;
+	else
+		*status += CHECKER;
+}
+
+void	apply_bump(t_obj obj)
+{
+	int	*status;
+
+	status = get_p_status(obj.type, obj.object);
+	if (*status & BUMP)
+		*status -= BUMP;
+	else
+		*status += BUMP;
+}
+
+void	apply_img(t_obj obj)
+{
+	int	*status;
+
+	status = get_p_status(obj.type, obj.object);
+	if (*status & IMAGE)
+		*status -= IMAGE;
+	else
+		*status += IMAGE;
 }
 
 t_mat	rotate_longitude(int angle)
@@ -1819,10 +2102,13 @@ void	translate_object(t_obj obj, int keycode)
 	current_object->coord = translated;
 }
 
-int	key_press_handler(int code, t_vars *vars)
+int	key_press_handler(int code, t_thread_pram *param)
 {
+	t_vars	*vars;
+
 	// (void)vars;
 	// printf("%d\n", code);
+	vars = param->vars;
 	if (vars->obj.type == NONE)
 		return (0);
 	if (code == ONE || code == TWO || code == THREE || code == FOUR)
@@ -1834,6 +2120,12 @@ int	key_press_handler(int code, t_vars *vars)
 		vars->obj.type = CAMERA;
 		vars->obj.object = &(vars->world.c);
 	}
+  else if (code == C)
+		apply_checker(vars->obj);
+	else if (code == B)
+		apply_bump(vars->obj);
+	else if (code == I)
+		apply_img(vars->obj);
 	draw_img(vars);
 	return (0);
 }
@@ -1869,7 +2161,6 @@ int	main(int argc, char **argv)
 	world->pl = 0;
 	world->cy = 0;
 	world->cn = 0;
-	pram = NULL;
 	if (read_file(fd, world))
 	{
 		init_mlx_pointers(&vars);
@@ -1879,16 +2170,15 @@ int	main(int argc, char **argv)
 			//free
 			return (1);
 		}
-		vars.param = param;
-		if (!draw_img(&world, &vars))
+		if (!draw_img(param))
 		{
 			//free
 			return (1);
 		}
 		vars.obj.type = CAMERA;
 		vars.obj.object = &(world->c);//world->pl->data; 
-		mlx_key_hook(vars.win, key_press_handler, &vars);
-		mlx_mouse_hook(vars.win, mouse_handler, &vars);
+		mlx_key_hook(vars.win, key_press_handler, param);
+		mlx_mouse_hook(vars.win, mouse_handler, param);
 		mlx_loop(vars.mlx);
 	}
 	else
