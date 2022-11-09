@@ -22,16 +22,25 @@
 #define UP			126
 #define RIGHT		124
 #define DOWN		125
-#define P_WID 		1920
-#define P_HEI		1080
-#define THREAD		8
-#define R_RAD		M_PI / 18
-#define Q			12 // linux 113
-#define E			14 // linux 101
-#define W			97  // linux 97
-#define A			115 // linux 115
-#define S			113 // linux 113
-#define D			101 // linux 101
+#define P_WID 		1280
+#define P_HEI		720
+#define THREAD		12
+#define ANGLE		30
+
+#define W			119 // linux 119,  mac 13 move up
+#define A			97  // linux 97, mac 0  move left
+#define S			115 // linux 115, mac 1  move down
+#define D			100 // linux 100, mac 2  move right
+#define Q			113 // linux 113, mac 12 move forward
+#define E			101 // linux 101, mac 14 move backward
+
+#define ONE			49 // linux 49, mac 18 rotate forward
+#define TWO			50 // linux 50, mac 19 rotate backward
+#define THREE		51 // linux 51, mac 20 choose rotate circle forward
+#define FOUR		52 // linux 52, mac 21 choose rotate circle backward
+
+#define Z			6  // linux 122, mac 6  move forward
+#define X			7  // linux 120, mac 7  move back
 //#define	INFINITY	1e500
 #define	S_EXP		32 // specular exponent
 // .rt 파일에서 비어있는 줄에 공백이 들어가면 모든 내용이 올바른 형식으로 들어와도 invalid format이라고 뜨고 종료한다. 처리하고싶으면 처리하자.
@@ -71,6 +80,9 @@ typedef struct s_obj_info
 {
 	t_coord	coord;
 	t_vec	norm;
+	int		lati;
+	int		longi;
+	t_vec	norm_const;
 }	t_obj_info;
 
 typedef struct s_ambient
@@ -90,6 +102,9 @@ typedef struct s_camera
 {
 	t_coord	coord;
 	t_vec	norm;
+	int		lati;
+	int		longi;
+	t_vec	norm_const;
 	int		fov;
 }	t_camera;
 
@@ -104,6 +119,9 @@ typedef struct s_plane
 {
 	t_coord	coord;
 	t_vec	norm;
+	int		lati;
+	int		longi;
+	t_vec	norm_const;
 	t_rgb	rgb;
 }	t_pl;
 
@@ -111,6 +129,9 @@ typedef struct s_cylinder
 {
 	t_coord	coord;
 	t_vec	norm;
+	int		lati;
+	int		longi;
+	t_vec	norm_const;
 	double	diameter;
 	double	height;
 	t_rgb	rgb;
@@ -170,10 +191,8 @@ typedef struct s_vec4
 
 typedef struct s_mat
 {
-	t_vec4	r1;
-	t_vec4	r2;
-	t_vec4	r3;
-	t_vec4	r4;
+	double	arr[4][4];
+	int		len;
 }	t_mat;
 
 t_vec	get_basis_vec(t_vec);
@@ -352,6 +371,9 @@ int	set_camera(char **info, int cnt, t_world *world)
 		return (0);
 	if (!get_int(info[3], &fov)	|| fov < 0 || 180 < fov) // 180 0
 		return (0);
+	c->lati = 0;
+	c->longi = 0;
+	c->norm_const = c->norm;
 	c->fov = fov;
 	return (1);
 }
@@ -370,6 +392,9 @@ int	set_plane(char **info, int cnt, t_world *world)
 		return (0);
 	if (!set_rgb(info[3], &(pl->rgb)))
 		return (0);
+	pl->longi = 0;
+	pl->lati = 0;
+	pl->norm_const = pl->norm;
 	return (1);
 }
 
@@ -411,6 +436,9 @@ int	set_cylinder(char **info, int cnt, t_world *world)
 		return (0);
 	if (!set_rgb(info[5], &(cy->rgb)))
 		return (0);
+	cy->lati = 0;
+	cy->longi = 0;
+	cy->norm_const = cy->norm;
 	cy->diameter = diameter;
 	cy->height = height;
 	return (1);
@@ -436,6 +464,9 @@ int	set_cone(char **info, int cnt, t_world *world)
 		return (0);
 	if (!set_rgb(info[5], &(cn->rgb)))
 		return (0);
+	cn->lati = 0;
+	cn->longi = 0;
+	cn->norm_const = cn->norm;	
 	cn->diameter = diameter;
 	cn->height = height;
 	return (1);
@@ -638,59 +669,252 @@ t_vec	vec_neg(t_vec vec)
 	return ((t_vec){-vec.x, -vec.y, -vec.z});
 }
 
+void	print_vector(char *str, t_vec vec) //////////
+{
+	printf("%s", str);
+	printf("<%f\t%f\t%f>\n", vec.x, vec.y, vec.z);
+}
+
 /********************matrices*************************/
-// double	vec4_dot(t_vec4 v1, t_vec4 v2)
-// {
-// 	return (v1.x * v2.x + v1.y * v2.y + v1.z * v2.z + v1.w * v2.w);
-// }
+void	print_matrix(t_mat mat) //////////
+{
+	printf("|%f,\t%f,\t%f,\t%f|\n|%f,\t%f,\t%f,\t%f|\n|%f,\t%f,\t%f,\t%f|\n|%f,\t%f,\t%f,\t%f|\n\n",
+		mat.arr[0][0], mat.arr[0][1], mat.arr[0][2], mat.arr[0][3],
+		mat.arr[1][0], mat.arr[1][1], mat.arr[1][2], mat.arr[1][3],
+		mat.arr[2][0], mat.arr[2][1], mat.arr[2][2], mat.arr[2][3],
+		mat.arr[3][0], mat.arr[3][1], mat.arr[3][2], mat.arr[3][3]);
+}
 
-// t_vec4	get_vec4(t_vec v)
-// {
-// 	return ((t_vec4){v.x, v.y, v.z, 1});
-// }
+double	vec4_dot(t_vec4 v1, t_vec4 v2)
+{
+	return (v1.x * v2.x + v1.y * v2.y + v1.z * v2.z + v1.w * v2.w);
+}
 
-// t_mat	mat_transpose(t_mat	mat)
-// {
-// 	return ((t_mat){mat.r1.x, mat.r2.x, mat.r3.x, mat.r4.x,
-// 		mat.r1.y, mat.r2.y, mat.r3.y, mat.r4.y,
-// 		mat.r1.z, mat.r2.z, mat.r3.z, mat.r4.z,
-// 		mat.r1.w, mat.r2.w, mat.r3.w, mat.r4.w});
-// }
+t_vec4	vec_to_vec4(t_vec v)
+{
+	return ((t_vec4){v.x, v.y, v.z, 1});
+}
 
-// double	met_determinant(t_mat mat) // if return value is 0(smaller than 1e-6 in code), there is no inverse matrix
-// {
+t_vec4	arr_to_vec4(double arr[4])
+{
+	return ((t_vec4){arr[0], arr[1], arr[2], arr[3]});
+}
 
-// }
+t_mat	mat_transpose(t_mat	mat)
+{
+	return ((t_mat){{
+		{mat.arr[0][0], mat.arr[1][0], mat.arr[2][0], mat.arr[3][0]},
+		{mat.arr[0][1], mat.arr[1][1], mat.arr[2][1], mat.arr[3][1]},
+		{mat.arr[0][2], mat.arr[1][2], mat.arr[2][2], mat.arr[3][2]},
+		{mat.arr[0][3], mat.arr[1][3], mat.arr[2][3], mat.arr[3][3]}
+		}, mat.len});
+}
 
-// t_mat	mat_inverse(t_mat mat)
-// {
+t_mat	mat_submat(t_mat mat, int r, int c)
+{
+	t_mat	ret;
+	int		ret_i;
+	int		ret_j;
+	int		i;
+	int		j;
 
-// }
+	i = -1;
+	ret_i = -1;
+	while (++i < mat.len)
+	{
+		if (i == r)
+			continue ;
+		++ret_i;
+		j = -1;
+		ret_j = -1;
+		while (++j < mat.len)
+		{
+			if (j == c)
+				continue ;
+			ret.arr[ret_i][++ret_j] = mat.arr[i][j];
+		}
+	}
+	ret.len = mat.len - 1;
+	return (ret);
+}
 
-// t_vec4	mat_mul_vec4(t_mat mat, t_vec4 v)
-// {
-// 	return ((t_vec4){vec4_dot(mat.r1, v), vec4_dot(mat.r2, v),
-// 		vec4_dot(mat.r3, v), vec4_dot(mat.r4, v)});
-// }
+double	mat_determinant(t_mat mat)
+{
+	double	det;
+	int		i;
 
-// t_mat	mat_mul_mat(t_mat mat1, t_mat mat2)
-// {
-// 	t_mat	mat2T;
+	det = 0;
+	if (mat.len == 2)
+		return (mat.arr[0][0] * mat.arr[1][1] - mat.arr[0][1] * mat.arr[1][0]);
+	i = -1;
+	while (++i < mat.len)
+		det += mat.arr[0][i]
+			* (1 - 2 * (i % 2)) * mat_determinant(mat_submat(mat, 0, i));
+	return (det);
+}
 
-// 	mat2T = mat_transpose(mat2);
-// 	return ((t_mat){mat_mul_vec4(mat2T, mat1.r1), mat_mul_vec4(mat2T, mat1.r2),
-// 		mat_mul_vec4(mat2T, mat1.r3), mat_mul_vec4(mat2T, mat1.r4)});
-// }
+t_mat	mat_comatrix(t_mat mat)
+{
+	t_mat	comatrix;
+	int		i;
+	int		j;
+	int		len;
 
-// t_mat	mat_translation(double x, double y, double z)
-// {
-// 	return ((t_mat){{1, 0, 0, x}, {0, 1, 0, y}, {0, 0, 1, z}, {0, 0, 0, 1}});
-// }
+	len = mat.len;	
+	i = -1;
+	while (++i < len)
+	{
+		j = -1;
+		while (++j < len)
+			comatrix.arr[i][j] = (1 - 2 * ((i + j) % 2))
+				* mat_determinant(mat_submat(mat, i, j));
+	}
+	comatrix.len = len;
+	return (comatrix);
+}
 
-// t_mat	mat_rotation(void)
-// {
+t_mat	mat_scale(t_mat mat, double scalar)
+{
+	t_mat	ret;
+	int		i;
+	int		j;
+	int		len;
+
+	len = mat.len;
+	i = -1;
+	while (++i < len)
+	{
+		j = -1;
+		while (++j < len)
+			ret.arr[i][j] = mat.arr[i][j] / scalar;
+	}
+	ret.len = len;
+	return (ret);
+}
+
+t_mat	mat_inverse(t_mat mat) // this function is used only for rotation transformation matrices. they are always invertible so there is no need to calculate their determinatn.
+{
+	return (mat_scale(mat_transpose(mat_comatrix(mat)), mat_determinant(mat)));
+}
+
+t_vec4	mat_mul_vec4(t_mat mat, t_vec4 v)
+{
+	return ((t_vec4){vec4_dot(arr_to_vec4(mat.arr[0]), v),
+		vec4_dot(arr_to_vec4(mat.arr[1]), v),
+		vec4_dot(arr_to_vec4(mat.arr[2]), v),
+		vec4_dot(arr_to_vec4(mat.arr[3]), v)});
+}
+
+t_mat	mat_mul(t_mat mat1, t_mat mat2)
+{
+	t_mat	ret;
+	int		i;
+	int		j;
 	
-// }
+	i = -1;
+	while (++i < 4)
+	{
+		j = -1;
+		while (++j < 4)
+			ret.arr[i][j] = vec4_dot(arr_to_vec4(mat1.arr[i]),
+				(t_vec4){mat2.arr[0][j], mat2.arr[1][j],
+					mat2.arr[2][j], mat2.arr[3][j]});
+	}
+	ret.len = 4;
+	return (ret);
+}
+
+t_mat	mat_rx(double cosine, double sine)
+{
+	return ((t_mat){{
+		{1, 0, 0, 0},
+		{0, cosine, -sine, 0},
+		{0, sine, cosine, 0},
+		{0, 0, 0, 1}}, 4});
+}
+
+t_mat	mat_ry(double cosine, double sine)
+{
+	return ((t_mat){{
+		{cosine, 0, sine, 0},
+		{0, 1, 0, 0},
+		{-sine, 0, cosine, 0},
+		{0, 0, 0, 1}}, 4});	
+}
+
+t_mat	mat_rz(double cosine, double sine)
+{
+	return ((t_mat){{
+		{cosine, -sine, 0, 0},
+		{sine, cosine, 0, 0},
+		{0, 0, 1, 0},
+		{0, 0, 0, 1}}, 4});
+}
+
+t_mat	get_rx_to_z(t_vec forward)
+{
+	double	len_yz_proj;
+	double	cosine;
+	double	sine;
+	t_mat	mat_arr[4];
+
+	// if (fabs(fabs(forward.x) - 1) < 1e-6)
+	// 	return (mat_rx(cos(M_PI / 2), forward.x * sin(M_PI / 2)));
+	len_yz_proj = sqrt(pow(forward.y, 2) + pow(forward.z, 2));
+// you need below if-statement because cosine-sine logic is not work if forward is on x-axis.
+	if (len_yz_proj < 1e-6) // this means forward is on x axis.
+		return (mat_rx(cos(M_PI / 2), forward.x * sin(M_PI / 2)));
+	cosine = fabs(forward.z) / len_yz_proj;
+	sine = fabs(forward.y) / len_yz_proj;
+	mat_arr[0] = mat_rx(cosine, sine);		// 1사분면
+	mat_arr[1] = mat_rx(cosine, -sine);		// 2사분면
+	mat_arr[3] = mat_arr[1];				// 3사분면
+	mat_arr[2] = mat_arr[0];				// 4사분면
+	return (mat_arr[(fabs(forward.y) > 1e-6 && forward.y < 0)
+		+ 2 * (fabs(forward.z) > 1e-6 && forward.z < 0)]);
+}
+
+t_mat	get_ry_to_z(t_vec forward)	// 이미 rx로 회전해서 xz 평면상에 존재하는 백터에 대해 동작.
+{
+	double	cosine;
+	double	sine;
+	t_mat	mat_arr[4];
+
+	cosine = fabs(forward.z);
+	sine = fabs(forward.x);
+	mat_arr[0] = mat_ry(cosine, -sine);		// 1사분면
+	mat_arr[1] = mat_ry(cosine, sine);		// 2사분면
+	mat_arr[3] = mat_arr[1];				// 3사분면
+	mat_arr[2] = mat_arr[0];				// 4사분면
+	return (mat_arr[(fabs(forward.x) > 1e-6 && forward.x < 0)
+		+ 2 * (fabs(forward.z) > 1e-6 && forward.z < 0)]);
+}
+
+t_mat	mat_translation(double dx, double dy, double dz)
+{
+	return ((t_mat){{
+		{1, 0, 0, dx},
+		{0, 1, 0, dy},
+		{0, 0, 1, dz},
+		{0, 0, 0, 1}}, 4});
+}
+
+t_vec	rotate_normal(t_vec vec, t_mat op) // forward를 z축으로 변환 후 op 적용하고 다시 원래의 vec으로 변환
+{
+	t_mat	rx;
+	t_mat	ry;
+	t_vec4	res;
+
+	rx = get_rx_to_z(vec);
+	res = mat_mul_vec4(rx, vec_to_vec4(vec));
+	ry = get_ry_to_z((t_vec){res.x, res.y, res.z});
+	res = mat_mul_vec4(ry, res);
+	res = mat_mul_vec4(op, res);
+	res = mat_mul_vec4(mat_transpose(ry), res);
+	res = mat_mul_vec4(mat_transpose(rx), res);
+	return ((t_vec){res.x, res.y, res.z});
+}
+
 /***************************************************************************/
 
 double	choose_smaller_t(double current, double candidate, int condition)
@@ -1233,7 +1457,7 @@ t_vec	get_basis_vec(t_vec v)
 t_vec	get_viewport_vec(t_vec v)
 {
 	if (vec_len(vec_cross(v, (t_vec){0, 0, 1})) < 1e-6)
-		return ((t_vec){1, 0, 0});
+		return (vec_normalize((t_vec){1, 0, 1}));
 	return ((t_vec){0, 0, 1});
 }
 
@@ -1412,6 +1636,7 @@ int	trace_ray(t_img *img, t_world *world, t_ray ray, int i)
 }
 /////////////////////////////////////////////////////
 
+
 t_vec	vec_translate(t_vec v, double dx, double dy, double dz)
 {
 	return ((t_vec){v.x + dx, v.y + dy, v.z + dz});
@@ -1499,50 +1724,89 @@ int	create_thread_param(t_world *world, t_vars *vars, t_thread_param **param)
 	return (1);
 }
 
-void	rotate_object(t_obj obj, int keycode)
+t_mat	rotate_latitude(int angle)
 {
-	int			type;
-	t_vec		rotated;
-	t_obj_info	*info;
+	double	rad;
 
-	type = obj.type;
-	if (type == CYLINDER || type == PLANE || type == CONE || type == CAMERA)
-	{
-		info = (t_obj_info *)(obj.object);
-		printf("info normal : <%f, %f, %f>\n", info->norm.x, info->norm.y, info->norm.z);
-		printf("obj  normal : <%f, %f, %f>\n", ((t_cy *)(obj.object))->norm.x, ((t_cy *)(obj.object))->norm.y, ((t_cy *)(obj.object))->norm.z);
-		if (keycode == Q)
-			rotated = vec_rotate_v(info->norm);
-		else
-			rotated = vec_rotate_h(info->norm);
-		info->norm = rotated;
-		printf("info normal : <%f, %f, %f>\n", info->norm.x, info->norm.y, info->norm.z);
-		printf("obj  normal : <%f, %f, %f>\n", ((t_cy *)(obj.object))->norm.x, ((t_cy *)(obj.object))->norm.y, ((t_cy *)(obj.object))->norm.z);
-	}
+	rad = angle * M_PI / 180;
+	return (mat_rx(cos(rad), sin(rad)));
 }
 
-int	key_press_handler(int keycode, t_vars *vars)
+t_mat	rotate_longitude(int angle)
 {
-	printf("type is %d\n", vars->obj.type);
-	printf("keycode is %d\n", keycode);
+	double	rad;
+
+	rad = angle * M_PI / 180;
+	return (mat_ry(cos(rad), sin(rad)));
+}
+
+void	rotate_object(t_obj obj, int keycode)
+{
+	t_obj_info	*current_object;
+	int			latitude;
+	int			longitude;
+
+	current_object = (t_obj_info *)(obj.object);
+	latitude = current_object->lati;
+	longitude = current_object->longi;
+	latitude += (keycode == ONE) * ANGLE + (keycode == TWO) * -ANGLE;
+	latitude %= 360;
+	longitude += (keycode == THREE) * ANGLE + (keycode == FOUR) * -ANGLE;
+	longitude %= 360;
+	current_object->lati = latitude;
+	current_object->longi = longitude;
+	current_object->norm = rotate_normal(
+		current_object->norm_const,
+		mat_mul(rotate_longitude(longitude), rotate_latitude(latitude)));
+}
+
+void	translate_object(t_obj obj, int keycode)
+{
+	// t_obj_info	*current_object;
+	// t_vec4		translated;
+
+	// current_object = (t_obj_info *)(obj.object);
+	// translated = mat_mul_vec4(
+	// 	mat_translation(
+	// 		(keycode == W) - (keycode == S),
+	// 		(keycode == D) - (keycode == A),
+	// 		(keycode == E) - (keycode == Q)),
+	// 	vec_to_vec4(current_object->coord));
+	// current_object->coord = (t_vec){translated.x, translated.y, translated.z};
+	t_obj_info	*current_object;
+	t_coord		translated;
+
+	current_object = (t_obj_info *)(obj.object);
+	translated = current_object->coord;
+	translated = (t_vec){
+		translated.x + (keycode == W) - (keycode == S),
+		translated.y + (keycode == D) - (keycode == A),
+		translated.z + (keycode == E) - (keycode == Q)
+	};
+	current_object->coord = translated;
+}
+
+int	key_press_handler(int code, t_vars *vars)
+{
+	// (void)vars;
+	// printf("%d\n", code);
 	if (vars->obj.type == NONE)
 		return (0);
-	if (keycode == Q || keycode == E)
-		rotate_object(vars->obj, keycode);
-	// else if (keycode == W || keycode == A || keycode == D || keycode == D)
-		// WASD should be one of the parameters of the function going to be called here.
+	if (code == ONE || code == TWO || code == THREE || code == FOUR)
+		rotate_object(vars->obj, code);
+	else if (code == W || code == A || code == S || code == D
+		|| code == Q || code == E)
+		translate_object(vars->obj, code);
 	draw_img(&(vars->world), vars);
 	return (0);
 }
 
-// int	main(void) //keycode tester
-// {
-// 	t_vars		vars;
-
-// 	init_mlx_pointers(&vars);
-// 	mlx_key_hook(vars.win, key_press_handler, &vars);
-// 	mlx_loop(vars.mlx);
-// }
+int	mouse_handler(int code, t_vars *vars)
+{
+	(void)vars;
+	printf("%d\n", code);
+	return (0);
+}
 
 int	main(int argc, char **argv)
 {
@@ -1580,6 +1844,7 @@ int	main(int argc, char **argv)
 		vars.obj.type = CYLINDER;
 		vars.obj.object = world.cy->data;
 		mlx_key_hook(vars.win, key_press_handler, &vars);
+		mlx_mouse_hook(vars.win, mouse_handler, &vars);
 		mlx_loop(vars.mlx);
 	}
 	else
