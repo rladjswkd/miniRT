@@ -2167,6 +2167,12 @@ int	mouse_handler(int button, int x, int y, t_thread_param *param)
 	return (0);
 }
 
+int	exit_handler(void *param)
+{
+	(void)param;
+	exit(0); // replace exit with appropriate function.
+}
+
 int	main(int argc, char **argv)
 {
 	int				fd;
@@ -2202,6 +2208,7 @@ int	main(int argc, char **argv)
 		vars.obj.object = &(world.c);//world.pl->data; 
 		mlx_key_hook(vars.win, key_press_handler, param);
 		mlx_mouse_hook(vars.win, mouse_handler, param);
+		mlx_hook(vars.win, 17, 0, exit_handler, NULL);
 		mlx_loop(vars.mlx);
 	}
 	else
