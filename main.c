@@ -26,8 +26,8 @@
 #define DOWN		125
 
 #define BUMP_HIGHT_WEIGHT	100
-#define COLOR_IMG	"bump.png"
-#define BUMP_IMG	"bump3.png"
+#define COLOR_IMG	"bump.xpm"
+#define BUMP_IMG	"bump3.xpm"
 
 #define CHECKER		1
 #define IMAGE		2
@@ -265,22 +265,27 @@ void	destroy_world(t_world *world)
 
 void	destroy_mlx(t_vars *vars)
 {
-	mlx_destroy_image(vars->mlx, vars->b_img.ptr);
-	mlx_destroy_image(vars->mlx, vars->c_img.ptr);
 	mlx_destroy_image(vars->mlx, vars->img.ptr);
 	mlx_destroy_window(vars->mlx, vars->win);
 	free(vars->mlx);
 }
 
-int	exit_minirt(char *msg, t_world *world, t_vars *vars, t_thread_param *param)
+void	exit_minirt(char *msg, t_world *world, t_vars *vars, t_thread_param *param)
 {
-	printf("%s\n", msg);
+	int	exit_status;
+
+	exit_status = EXIT_FAILURE;
+	if (msg)
+	{
+		printf("%s\n", msg);
+		exit_status = EXIT_SUCCESS;
+	}
 	if (world)
 		destroy_world(world);
 	if (vars)
 		destroy_mlx(vars);
 	free(param);
-	return (EXIT_FAILURE);
+	exit(exit_status);
 }
 
 int	check_rgb(t_rgb rgb)
@@ -319,9 +324,9 @@ void	convert_color_to_grayscale(t_img *img)
 	}
 }
 
-int	get_new_png_image(void *mlx, t_img *img, char *file)
+int	get_new_xpm_image(void *mlx, t_img *img, char *file)
 {
-	img->ptr = mlx_png_file_to_image(mlx, file, \
+	img->ptr = mlx_xpm_file_to_image(mlx, file, \
 					&img->width, &img->height);
 	if (!img->ptr)
 		return (0);
@@ -347,9 +352,9 @@ int	init_mlx_pointers(t_vars *vars)
 			&vars->img.line_length, &vars->img.endian);
 	if (!vars->img.addr)
 		return (0);
-	if (!get_new_png_image(vars->mlx, &vars->c_img, COLOR_IMG))
+	if (!get_new_xpm_image(vars->mlx, &vars->c_img, COLOR_IMG))
 		return (0);
-	if (!get_new_png_image(vars->mlx, &vars->b_img, BUMP_IMG))
+	if (!get_new_xpm_image(vars->mlx, &vars->b_img, BUMP_IMG))
 		return (0);
 	convert_color_to_grayscale(&vars->b_img);
 	vars->obj.type = NONE;
@@ -2189,7 +2194,7 @@ void	select_non_selectable(t_thread_param *param, int code)
 
 int	exit_handler(t_thread_param *param)
 {
-	exit_minirt("", param->world, param->vars, param);
+	exit_minirt(0, param->world, param->vars, param);
 	return (0);
 }
 
@@ -2243,6 +2248,11 @@ void	init_world(t_world *world)
 	world->cn = 0;
 }
 
+void	foo(void)
+{
+	system("leaks minirt");
+}
+
 int	main(int argc, char **argv)
 {
 	int				fd;
@@ -2251,21 +2261,22 @@ int	main(int argc, char **argv)
 	t_thread_param	*param;
 
 	if (argc != 2)
-		return (exit_minirt(ERROR_MSG, 0, 0, 0));
+		exit_minirt(ERROR_MSG, 0, 0, 0);
 	fd = open_file(argv[1]);
 	if (fd < 0)
-		return (exit_minirt(ERROR_MSG, 0, 0, 0));
+		exit_minirt(ERROR_MSG, 0, 0, 0);
 	init_world(&world);
 	if (!read_file(fd, &world))
-		return (exit_minirt(ERROR_MSG, &world, 0, 0));
+		exit_minirt(ERROR_MSG, &world, 0, 0);
 	if (!init_mlx_pointers(&vars))
-		return (exit_minirt(ERROR_MSG, &world, &vars, 0));
+		exit_minirt(ERROR_MSG, &world, &vars, 0);
 	if (!create_thread_param(&world, &vars, &param) || !draw_img(param))
-		return (exit_minirt(ERROR_MSG, &world, &vars, param));
+		exit_minirt(ERROR_MSG, &world, &vars, param);
+	atexit(foo);
 	select_non_selectable(param, K);
 	mlx_key_hook(vars.win, key_press_handler, param);
 	mlx_mouse_hook(vars.win, mouse_handler, param);
-	mlx_hook(vars.win, 17, 0, exit_handler, NULL);
+	mlx_hook(vars.win, 17, 0, exit_handler, param);
 	mlx_loop(vars.mlx);
 	return (0);
 }
