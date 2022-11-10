@@ -9,6 +9,8 @@
 #include "mlx.h"
 #include <pthread.h>
 
+#define ERROR_MSG	"Error\nSomething went wrong!\n"
+
 #define	NONE		0
 #define SPHERE		1
 #define CYLINDER	2
@@ -55,6 +57,7 @@
 #define I			34 // linux
 
 #define K			40 // linux , mac 40 select camera
+#define L			37 // linux , mac 37 select light
 
 #define UP			126 // mac 126
 #define DOWN		125 // mac 125
@@ -234,7 +237,7 @@ typedef struct s_vars
 	t_img		img;
 	t_img		c_img;
 	t_img		b_img;
-	char		*b_map;
+	char		*b_map; // remove
 	t_obj		obj;
 }	t_vars;
 
@@ -249,6 +252,36 @@ typedef struct s_thread_param
 
 t_mat	rotate_latitude(int);
 t_mat	rotate_longitude(int);
+void	clear_list(t_node **);
+
+void	destroy_world(t_world *world)
+{
+	clear_list(&(world->l));
+	clear_list(&(world->sp));
+	clear_list(&(world->pl));
+	clear_list(&(world->cy));
+	clear_list(&(world->cn));	
+}
+
+void	destroy_mlx(t_vars *vars)
+{
+	mlx_destroy_image(vars->mlx, vars->b_img.ptr);
+	mlx_destroy_image(vars->mlx, vars->c_img.ptr);
+	mlx_destroy_image(vars->mlx, vars->img.ptr);
+	mlx_destroy_window(vars->mlx, vars->win);
+	free(vars->mlx);
+}
+
+int	exit_minirt(char *msg, t_world *world, t_vars *vars, t_thread_param *param)
+{
+	printf("%s\n", msg);
+	if (world)
+		destroy_world(world);
+	if (vars)
+		destroy_mlx(vars);
+	free(param);
+	return (EXIT_FAILURE);
+}
 
 int	check_rgb(t_rgb rgb)
 {
@@ -357,6 +390,8 @@ int	set_rgb(char *rgb_str, t_rgb *rgb)
 	if (!check_comma_cnt(rgb_str))
 		return (0);
 	rgb_info = split_line(rgb_str, ',', &rgb_info_cnt);
+	if (!rgb_info)
+		return (0);
 	if (rgb_info_cnt != 3
 		|| !get_int(rgb_info[0], &(rgb->r))
 		|| !get_int(rgb_info[1], &(rgb->g))
@@ -375,6 +410,8 @@ int	set_coordinate(char *coord_str, t_coord *coord)
 	if (!check_comma_cnt(coord_str))
 		return (0);
 	coord_info = split_line(coord_str, ',', &coord_info_cnt);
+	if (!coord_info)
+		return (0);
 	if (coord_info_cnt != 3
 		|| !get_double(coord_info[0], &(coord->x))
 		|| !get_double(coord_info[1], &(coord->y))
@@ -1440,7 +1477,7 @@ t_uv	uv_map_sphere(t_coord p, t_sp sp)
 	t_vec	vec;
 
 	vec = vec_normalize(vec_sub(p, sp.coord));
-	uv.u = 0.5 + atan2(vec.x, vec.y) / (2 * M_PI);
+	uv.u = 1 - (0.5 + atan2(vec.x, vec.y) / (2 * M_PI));
 	uv.v = 0.5 - asin(vec.z) / M_PI;
 	uv.pu = vec_normalize(vec_cross(vec, get_basis_vec(vec)));
 	uv.pv = vec_normalize(vec_cross(vec, uv.pu));
@@ -2130,24 +2167,46 @@ void	resize_height(t_thread_param *param, int code)
 		*height = 1.0;
 }
 
+void	select_non_selectable(t_thread_param *param, int code)
+{
+	t_obj			*obj;
+	static t_node	*light;
+
+	obj = &(param->vars->obj);
+	if (code == K)
+	{
+		obj->type = CAMERA;
+		obj->object = &(param->world->c);
+		return ;
+	}
+	if (light == NULL || light->next == NULL)
+		light = param->world->l;
+	else
+		light = light->next;
+	obj->type = LIGHT;
+	obj->object = light->data;	
+}
+
+int	exit_handler(t_thread_param *param)
+{
+	exit_minirt("", param->world, param->vars, param);
+	return (0);
+}
+
 int	key_press_handler(int code, t_thread_param *param)
 {
 	t_vars	*vars;
 
-	// (void)param;
-	// printf("%d\n", code);
 	if (code == ESC)
-		exit(0); // replace exit with appropriate function.
+		return (exit_handler(param));
 	vars = param->vars;
 	if (code == ONE || code == TWO || code == THREE || code == FOUR)
 		rotate_object(param, code);
 	else if (code == W || code == A || code == S || code == D
 		|| code == Q || code == E)
 		translate_object(param, code);
-	else if (code == K) {
-		vars->obj.type = CAMERA;
-		vars->obj.object = &(param->world->c);
-	}
+	else if (code == K || code == L)
+		select_non_selectable(param, code);
 	else if (code == UP || code == DOWN)
 		resize_diameter(param, code);
 	else if (code == LEFT || code == RIGHT)
@@ -2175,10 +2234,13 @@ int	mouse_handler(int button, int x, int y, t_thread_param *param)
 	return (0);
 }
 
-int	exit_handler(void *param)
+void	init_world(t_world *world)
 {
-	(void)param;
-	exit(0); // replace exit with appropriate function.
+	world->l = 0;
+	world->sp = 0;
+	world->pl = 0;
+	world->cy = 0;
+	world->cn = 0;
 }
 
 int	main(int argc, char **argv)
@@ -2189,43 +2251,21 @@ int	main(int argc, char **argv)
 	t_thread_param	*param;
 
 	if (argc != 2)
-		return (0); // call error handling function with proper error message.
+		return (exit_minirt(ERROR_MSG, 0, 0, 0));
 	fd = open_file(argv[1]);
-	if (fd < 0) // remove this when error handling function is completed.
-		return (0); // 에러 문자열 출력하고 처리해주기
-	world.l = 0;
-	world.sp = 0;
-	world.pl = 0;
-	world.cy = 0;
-	world.cn = 0;
-	if (read_file(fd, &world))
-	{
-		init_mlx_pointers(&vars);
-		printf("%s\n", "valid format");
-		if (!create_thread_param(&world, &vars, &param))
-		{
-			//free
-			return (1);
-		}
-		if (!draw_img(param))
-		{
-			//free
-			return (1);
-		}
-		vars.obj.type = CAMERA;
-		vars.obj.object = &(world.c);//world.pl->data; 
-		mlx_key_hook(vars.win, key_press_handler, param);
-		mlx_mouse_hook(vars.win, mouse_handler, param);
-		mlx_hook(vars.win, 17, 0, exit_handler, NULL);
-		mlx_loop(vars.mlx);
-	}
-	else
-		printf("%s\n", "invalid format");
-	clear_list(&(world.l));
-	clear_list(&(world.sp));
-	clear_list(&(world.pl));
-	clear_list(&(world.cy));
-	clear_list(&(world.cn));
-	// free(param);
+	if (fd < 0)
+		return (exit_minirt(ERROR_MSG, 0, 0, 0));
+	init_world(&world);
+	if (!read_file(fd, &world))
+		return (exit_minirt(ERROR_MSG, &world, 0, 0));
+	if (!init_mlx_pointers(&vars))
+		return (exit_minirt(ERROR_MSG, &world, &vars, 0));
+	if (!create_thread_param(&world, &vars, &param) || !draw_img(param))
+		return (exit_minirt(ERROR_MSG, &world, &vars, param));
+	select_non_selectable(param, K);
+	mlx_key_hook(vars.win, key_press_handler, param);
+	mlx_mouse_hook(vars.win, mouse_handler, param);
+	mlx_hook(vars.win, 17, 0, exit_handler, NULL);
+	mlx_loop(vars.mlx);
 	return (0);
 }
