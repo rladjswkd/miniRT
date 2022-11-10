@@ -23,8 +23,8 @@
 #define RIGHT		124
 #define DOWN		125
 
-#define BUMP_HIGHT_WEIGHT	100
-#define BUMP_IMG	"bump.png"
+#define BUMP_HIGHT_WEIGHT	1000
+#define BUMP_IMG	"bump3.png"
 
 #define CHECKER		1
 #define IMAGE		2
@@ -54,6 +54,13 @@
 #define I			34 // linux
 
 #define K			40 // linux , mac 40 select camera
+
+#define UP			126 // mac 126
+#define DOWN		125 // mac 125
+#define LEFT		123 // mac 123
+#define RIGHT		124 // mac 124
+
+#define ESC			53
 // #define Z			6  // linux 122, mac 6  move forward
 // #define X			7  // linux 120, mac 7  move back
 //#define	INFINITY	1e500
@@ -2069,17 +2076,60 @@ void	translate_object(t_thread_param *param, int keycode)
 	d_vec = vec_add(
 		vec_add(
 			vec_scale(get_viewport_vec(camera, (t_vec4){-1, 0, 0, 1}), 10 * ((keycode == E) - (keycode == Q))),
-			vec_scale(get_viewport_vec(camera, (t_vec4){0, -1, 0, 1}), 10 * ((keycode == D) - (keycode == A)))),
+			vec_scale(get_viewport_vec(camera, (t_vec4){0, -1, 0, 1}), 10 * ((keycode == D) - (keycode == A)))
+		), 
 		vec_scale(camera.norm, 10 * ((keycode == W) - (keycode == S))));
 	current_object->coord = vec_add(current_object->coord, d_vec);
+}
+
+void	resize_diameter(t_thread_param *param, int code)
+{
+	t_obj	obj;
+	int		type;
+	double	*diameter;
+
+	obj = param->vars->obj;
+	type = obj.type;
+	if (type == SPHERE)
+		diameter = &(((t_sp *)(obj.object))->diameter);
+	else if (type == CYLINDER)
+		diameter = &(((t_cy *)(obj.object))->diameter);
+	else if (type == CONE)
+		diameter = &(((t_cn *)(obj.object))->diameter);
+	else
+		return ;
+	*diameter += (code == UP) - (code == DOWN);
+	if (*diameter < 1e-6)
+		*diameter = 1.0;
+}
+
+void	resize_height(t_thread_param *param, int code)
+{
+	t_obj	obj;
+	int		type;
+	double	*height;
+
+	obj = param->vars->obj;
+	type = obj.type;
+	if (type == CYLINDER)
+		height = &(((t_cy *)(obj.object))->height);
+	else if (type == CONE)
+		height = &(((t_cn *)(obj.object))->height);
+	else
+		return ;
+	*height += (code == RIGHT) - (code == LEFT);
+	if (*height < 1e-6)
+		*height = 1.0;
 }
 
 int	key_press_handler(int code, t_thread_param *param)
 {
 	t_vars	*vars;
 
-	// (void)vars;
+	// (void)param;
 	// printf("%d\n", code);
+	if (code == ESC)
+		exit(0); // replace exit with appropriate function.
 	vars = param->vars;
 	if (code == ONE || code == TWO || code == THREE || code == FOUR)
 		rotate_object(param, code);
@@ -2090,6 +2140,10 @@ int	key_press_handler(int code, t_thread_param *param)
 		vars->obj.type = CAMERA;
 		vars->obj.object = &(param->world->c);
 	}
+	else if (code == UP || code == DOWN)
+		resize_diameter(param, code);
+	else if (code == LEFT || code == RIGHT)
+		resize_height(param, code);
 	else if (code == C)
 		apply_checker(vars->obj);
 	else if (code == B)
