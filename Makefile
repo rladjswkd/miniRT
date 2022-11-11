@@ -42,7 +42,7 @@ SRCS = allocator.c\
        vector_operation_2.c\
        viewport.c
 OBJS = $(SRCS:.c=.o)
-CC = gcc
+CC = cc
 CFLAGS = -Wall -Wextra -Werror
 RM = rm
 RMFLAGS = -f
