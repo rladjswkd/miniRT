@@ -237,7 +237,6 @@ typedef struct s_vars
 	t_img		img;
 	t_img		c_img;
 	t_img		b_img;
-	char		*b_map; // remove
 	t_obj		obj;
 }	t_vars;
 
@@ -265,9 +264,11 @@ void	destroy_world(t_world *world)
 
 void	destroy_mlx(t_vars *vars)
 {
+	// mlx_destroy_image(vars->mlx, vars->b_img.ptr);
+	// mlx_destroy_image(vars->mlx, vars->c_img.ptr);
 	mlx_destroy_image(vars->mlx, vars->img.ptr);
 	mlx_destroy_window(vars->mlx, vars->win);
-	free(vars->mlx);
+	mlx_destroy(vars->mlx);
 }
 
 void	exit_minirt(char *msg, t_world *world, t_vars *vars, t_thread_param *param)
@@ -2250,7 +2251,7 @@ void	init_world(t_world *world)
 
 void	foo(void)
 {
-	system("leaks minirt");
+	system("leaks miniRT");
 }
 
 int	main(int argc, char **argv)
