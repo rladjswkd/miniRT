@@ -11,6 +11,7 @@
 /* ************************************************************************** */
 
 #include "get_next_line.h"
+
 int	find_new_line(char *data, int start, int len)
 {
 	int	i;

@@ -1,3 +1,15 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   set_world.c                                        :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: gyepark <gyepark@student.42seoul.kr>       +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2022/11/11 19:56:57 by gyepark           #+#    #+#             */
+/*   Updated: 2022/11/11 19:57:00 by gyepark          ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #include "structure.h"
 #include "linked_list.h"
 #include "set_essential.h"
@@ -34,7 +46,7 @@ int	set_world(char *line, t_world *rt, int *mask)
 	int			index;
 	static int	(*fp[7])(char **, int, t_world *) = {set_ambient, set_camera,
 		set_light, set_sphere, set_plane, set_cylinder, set_cylinder};
-	
+
 	splitted = split_line(line, ' ', &cnt);
 	if (!(splitted && splitted[0]))
 		return (free_splitted(splitted, 0));
@@ -45,7 +57,7 @@ int	set_world(char *line, t_world *rt, int *mask)
 		return (free_splitted(splitted, 0));
 	*mask |= 1 << index;
 	if (1 < index
-		&& (!set_object_list(rt, index)	|| !(*fp[index])(splitted, cnt, rt)))
+		&& (!set_object_list(rt, index) || !(*fp[index])(splitted, cnt, rt)))
 		return (free_splitted(splitted, 0));
 	return (free_splitted(splitted, 1));
 }

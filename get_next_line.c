@@ -11,6 +11,7 @@
 /* ************************************************************************** */
 
 #include "get_next_line.h"
+
 static char	*free_builder_data(t_builder *builder)
 {
 	free(builder->data);

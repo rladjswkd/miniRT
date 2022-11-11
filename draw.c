@@ -1,3 +1,15 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   draw.c                                             :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: gyepark <gyepark@student.42seoul.kr>       +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2022/11/11 19:55:23 by gyepark           #+#    #+#             */
+/*   Updated: 2022/11/11 19:55:25 by gyepark          ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #include "structure.h"
 #include "constant.h"
 #include "ray.h"
@@ -25,10 +37,10 @@ void	*drawing(void *b_param)
 	return (0);
 }
 
-int draw_img(t_thread_param *param)
+int	draw_img(t_thread_param *param)
 {
 	t_viewport	viewport;
-  	t_vars		*vars;
+	t_vars		*vars;
 	void		*tmp;
 	int			i;
 

@@ -1,3 +1,15 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   normal_transformation.c                            :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: gyepark <gyepark@student.42seoul.kr>       +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2022/11/11 19:56:41 by gyepark           #+#    #+#             */
+/*   Updated: 2022/11/11 19:56:41 by gyepark          ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #include "structure.h"
 #include "constant.h"
 #include "uv_mapper.h"
@@ -40,12 +52,14 @@ t_vec	get_bump_norm(t_vars *vars, t_obj obj, t_vec p, t_vec n)
 		uv = uv_map_plane(p, *(t_pl *)obj.object);
 	else if (obj.type == CONE)
 		uv = uv_map_cone(p, *(t_cn *)obj.object);
-	i = vars->b_img.width * uv.u + (int)(vars->b_img.height * uv.v) * vars->b_img.width;
+	i = vars->b_img.width * uv.u
+		+ (int)(vars->b_img.height * uv.v) * vars->b_img.width;
 	bu = vars->b_img.addr[i * 4] - vars->b_img.addr[(i + 1) * 4];
-	bv = vars->b_img.addr[i * 4] - vars->b_img.addr[(vars->b_img.width + i) * 4];
+	bv = vars->b_img.addr[i * 4]
+		- vars->b_img.addr[(vars->b_img.width + i) * 4];
 	bu /= BUMP_HIGHT_WEIGHT;
 	bv /= BUMP_HIGHT_WEIGHT;
 	ret = vec_sub(vec_scale(vec_cross(n, uv.pv), bu),
-		vec_scale(vec_cross(n, uv.pu), bv));
+			vec_scale(vec_cross(n, uv.pu), bv));
 	return (vec_normalize(vec_add(n, ret)));
 }

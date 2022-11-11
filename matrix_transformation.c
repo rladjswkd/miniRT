@@ -1,3 +1,15 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   matrix_transformation.c                            :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: gyepark <gyepark@student.42seoul.kr>       +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2022/11/11 19:56:35 by gyepark           #+#    #+#             */
+/*   Updated: 2022/11/11 19:56:36 by gyepark          ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #include "structure.h"
 #include "matrix_rotation.h"
 #include <math.h>
@@ -17,9 +29,9 @@ t_mat	get_rx_to_z(t_vec forward)
 	mat_arr[0] = mat_rx(cosine, sine);
 	mat_arr[1] = mat_rx(cosine, -sine);
 	mat_arr[3] = mat_arr[1];
-	mat_arr[2] = mat_arr[0];	
+	mat_arr[2] = mat_arr[0];
 	return (mat_arr[(fabs(forward.y) > 1e-6 && forward.y < 0)
-		+ 2 * (fabs(forward.z) > 1e-6 && forward.z < 0)]);
+			+ 2 * (fabs(forward.z) > 1e-6 && forward.z < 0)]);
 }
 
 t_mat	get_ry_to_z(t_vec forward)
@@ -35,16 +47,16 @@ t_mat	get_ry_to_z(t_vec forward)
 	mat_arr[3] = mat_arr[1];
 	mat_arr[2] = mat_arr[0];
 	return (mat_arr[(fabs(forward.x) > 1e-6 && forward.x < 0)
-		+ 2 * (fabs(forward.z) > 1e-6 && forward.z < 0)]);
+			+ 2 * (fabs(forward.z) > 1e-6 && forward.z < 0)]);
 }
 
 t_mat	mat_translation(double dx, double dy, double dz)
 {
 	return ((t_mat){{
-		{1, 0, 0, dx},
-		{0, 1, 0, dy},
-		{0, 0, 1, dz},
-		{0, 0, 0, 1}}, 4});
+			{1, 0, 0, dx},
+			{0, 1, 0, dy},
+			{0, 0, 1, dz},
+			{0, 0, 0, 1}}, 4});
 }
 
 t_mat	rotate_latitude(int angle)

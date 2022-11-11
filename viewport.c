@@ -1,3 +1,15 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   viewport.c                                         :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: gyepark <gyepark@student.42seoul.kr>       +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2022/11/11 19:57:35 by gyepark           #+#    #+#             */
+/*   Updated: 2022/11/11 19:57:36 by gyepark          ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #include "structure.h"
 #include "constant.h"
 #include "vector_operation.h"
@@ -9,8 +21,8 @@
 t_vec	get_viewport_vec(t_camera c, t_vec4 axis)
 {
 	return (vec4_to_vec(mat_mul_vec4(
-		mat_mul(rotate_longitude(c.longi), rotate_latitude(c.lati)),
-		axis)));
+				mat_mul(rotate_longitude(c.longi), rotate_latitude(c.lati)),
+				axis)));
 }
 
 t_viewport	generate_viewport(t_camera c)

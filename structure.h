@@ -1,3 +1,15 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   structure.h                                        :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: gyepark <gyepark@student.42seoul.kr>       +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2022/11/11 19:59:56 by gyepark           #+#    #+#             */
+/*   Updated: 2022/11/11 20:02:53 by gyepark          ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #ifndef STRUCTURE_H
 # define STRUCTURE_H
 # include <pthread.h>
@@ -34,7 +46,7 @@ typedef struct s_coordinate
 	double	z;
 }	t_coord;
 
-typedef	t_coord	t_vec;
+typedef t_coord	t_vec;
 
 typedef struct s_obj_info
 {

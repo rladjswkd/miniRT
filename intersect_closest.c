@@ -1,3 +1,15 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   intersect_closest.c                                :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: gyepark <gyepark@student.42seoul.kr>       +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2022/11/11 19:55:58 by gyepark           #+#    #+#             */
+/*   Updated: 2022/11/11 19:55:59 by gyepark          ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #include "structure.h"
 #include "vector_operation.h"
 #include <math.h>
@@ -27,10 +39,10 @@ void	solve_equation(t_equation eq, t_inter *inter)
 int	is_valid_t1t2(t_cy cy, t_ray ray, double t)
 {
 	return (t > 1 && vec_dot(cy.norm, vec_sub(
-		vec_add(ray.pos, vec_scale(ray.dir, t)), cy.coord)) > 0
-		&& vec_dot(cy.norm, vec_sub( 
-		vec_add(ray.pos, vec_scale(ray.dir, t)),
-		vec_add(cy.coord, vec_scale(cy.norm, cy.height)))) < 0);
+				vec_add(ray.pos, vec_scale(ray.dir, t)), cy.coord)) > 0
+		&& vec_dot(cy.norm, vec_sub(
+				vec_add(ray.pos, vec_scale(ray.dir, t)),
+				vec_add(cy.coord, vec_scale(cy.norm, cy.height)))) < 0);
 }
 
 int	is_valid_t3(t_cy cy, t_ray ray, double t)
@@ -38,7 +50,7 @@ int	is_valid_t3(t_cy cy, t_ray ray, double t)
 	t_vec	q_to_cap;
 
 	q_to_cap = vec_sub(vec_add(ray.pos, vec_scale(ray.dir, t)),
-		cy.coord);
+			cy.coord);
 	return (t > 1 && vec_dot(q_to_cap, q_to_cap) < pow(cy.diameter / 2, 2));
 }
 
@@ -47,6 +59,6 @@ int	is_valid_t4(t_cy cy, t_ray ray, double t)
 	t_vec	q_to_cap;
 
 	q_to_cap = vec_sub(vec_add(ray.pos, vec_scale(ray.dir, t)),
-		vec_add(cy.coord, vec_scale(cy.norm, cy.height)));
+			vec_add(cy.coord, vec_scale(cy.norm, cy.height)));
 	return (t > 1 && vec_dot(q_to_cap, q_to_cap) < pow(cy.diameter / 2, 2));
 }
