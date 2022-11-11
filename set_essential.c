@@ -1,3 +1,15 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   set_essential.c                                    :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: gyepark <gyepark@student.42seoul.kr>       +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2022/11/11 19:56:55 by gyepark           #+#    #+#             */
+/*   Updated: 2022/11/11 19:56:56 by gyepark          ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #include "structure.h"
 #include "linked_list.h"
 #include "checker.h"
@@ -90,7 +102,7 @@ int	set_camera(char **info, int cnt, t_world *world)
 	if (!set_coordinate(info[2], &(c->norm))
 		|| !check_normal(c->norm))
 		return (0);
-	if (!get_int(info[3], &fov)	|| fov < 0 || 180 < fov) // 180 0
+	if (!get_int(info[3], &fov) || fov < 0 || 180 < fov)
 		return (0);
 	c->lati = 0;
 	c->longi = 0;

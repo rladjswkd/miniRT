@@ -1,3 +1,15 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   file_processor.c                                   :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: gyepark <gyepark@student.42seoul.kr>       +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2022/11/11 19:55:43 by gyepark           #+#    #+#             */
+/*   Updated: 2022/11/11 19:55:44 by gyepark          ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #include <fcntl.h>
 #include <stdlib.h>
 #include "structure.h"
@@ -13,8 +25,7 @@ int	open_file(char *path)
 	fd = -1;
 	len = ft_strlen(path);
 	if (path[len - 3] == '.' && path[len - 2] == 'r' && path[len - 1] == 't')
-		fd = open(path, O_RDONLY); // is read-only enough?
-	// call error handling function to exit.
+		fd = open(path, O_RDONLY);
 	return (fd);
 }
 
@@ -22,7 +33,7 @@ int	read_file(int fd, t_world *world)
 {
 	char		*line;
 	int			flag;
-	static int	mask = 0; // bit-mask to check A, C, L should be declared only and at least once.
+	static int	mask = 0;
 
 	flag = 1;
 	while (flag)

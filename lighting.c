@@ -1,3 +1,15 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   lighting.c                                         :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: gyepark <gyepark@student.42seoul.kr>       +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2022/11/11 19:56:20 by gyepark           #+#    #+#             */
+/*   Updated: 2022/11/11 19:56:20 by gyepark          ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #include "structure.h"
 #include "constant.h"
 #include "vector_operation.h"
@@ -41,12 +53,19 @@ t_vec	compute_specular(t_vec inter, t_vec n, t_vec v, t_light light)
 	return (ret);
 }
 
+static t_vec	lower_to_one(t_vec lighting)
+{
+	lighting.x -= (lighting.x > 1.0) * (lighting.x - 1.0);
+	lighting.y -= (lighting.y > 1.0) * (lighting.y - 1.0);
+	lighting.z -= (lighting.z > 1.0) * (lighting.z - 1.0);
+	return (lighting);
+}
+
 t_vec	compute_lighting(t_vec inter, t_vec n, t_vec v, t_world world)
 {
 	t_vec	v_ambient;
 	t_vec	v_diffuse;
 	t_vec	v_specular;
-	t_vec	lighting;
 	t_node	*l;
 
 	l = world.l;
@@ -57,14 +76,12 @@ t_vec	compute_lighting(t_vec inter, t_vec n, t_vec v, t_world world)
 	{	
 		if (!check_shadow(world, get_l_ray(*(t_light *)l->data, inter)))
 		{
-			v_diffuse = vec_add(v_diffuse, compute_diffuse(inter, n, *(t_light *)l->data));
-			v_specular = vec_add(v_specular, compute_specular(inter, n, v, *(t_light *)l->data));
+			v_diffuse = vec_add(v_diffuse,
+					compute_diffuse(inter, n, *(t_light *)l->data));
+			v_specular = vec_add(v_specular,
+					compute_specular(inter, n, v, *(t_light *)l->data));
 		}
 		l = l->next;
 	}
-	lighting = vec_add(vec_add(v_ambient, v_diffuse), v_specular);
-	lighting.x -= (lighting.x > 1.0) * (lighting.x - 1.0);
-	lighting.y -= (lighting.y > 1.0) * (lighting.y - 1.0);
-	lighting.z -= (lighting.z > 1.0) * (lighting.z - 1.0);
-	return (lighting);
+	return (lower_to_one(vec_add(vec_add(v_ambient, v_diffuse), v_specular)));
 }

@@ -1,6 +1,18 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   converter.c                                        :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: gyepark <gyepark@student.42seoul.kr>       +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2022/11/11 19:55:18 by gyepark           #+#    #+#             */
+/*   Updated: 2022/11/11 19:55:19 by gyepark          ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 static int	get_sign(char **str)
 {
-       	int	sign;
+	int	sign;
 
 	sign = 1;
 	if (**str == '-' || **str == '+')
@@ -12,7 +24,7 @@ static int	get_sign(char **str)
 int	get_double(char *str, double *converted)
 {
 	double	scale;
-    int		sign;
+	int		sign;
 
 	sign = get_sign(&str);
 	*converted = 0;

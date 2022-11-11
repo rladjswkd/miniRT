@@ -1,3 +1,15 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   matrix_inverse.c                                   :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: gyepark <gyepark@student.42seoul.kr>       +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2022/11/11 19:56:28 by gyepark           #+#    #+#             */
+/*   Updated: 2022/11/11 19:56:28 by gyepark          ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #include "structure.h"
 #include "matrix_transpose.h"
 
@@ -51,7 +63,7 @@ static t_mat	mat_comatrix(t_mat mat)
 	int		j;
 	int		len;
 
-	len = mat.len;	
+	len = mat.len;
 	i = -1;
 	while (++i < len)
 	{
@@ -83,7 +95,7 @@ static t_mat	mat_scale(t_mat mat, double scalar)
 	return (ret);
 }
 
-t_mat	mat_inverse(t_mat mat) // this function is used only for rotation transformation matrices. they are always invertible so there is no need to calculate their determinatn.
+t_mat	mat_inverse(t_mat mat)
 {
 	return (mat_scale(mat_transpose(mat_comatrix(mat)), mat_determinant(mat)));
 }

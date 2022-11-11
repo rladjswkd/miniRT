@@ -1,6 +1,19 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   vector_operation.h                                 :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: gyepark <gyepark@student.42seoul.kr>       +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2022/11/11 20:00:09 by gyepark           #+#    #+#             */
+/*   Updated: 2022/11/11 20:03:08 by gyepark          ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #ifndef VECTOR_OPERATION_H
 # define VECTOR_OPERATION_H
 # include "structure.h"
+
 t_vec	vec_add(t_vec v1, t_vec v2);
 t_vec	vec_sub(t_vec v1, t_vec v2);
 t_vec	vec_scale(t_vec vec, double scalar);

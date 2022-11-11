@@ -1,3 +1,15 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   uv_mapper.c                                        :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: gyepark <gyepark@student.42seoul.kr>       +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2022/11/11 19:57:12 by gyepark           #+#    #+#             */
+/*   Updated: 2022/11/11 19:57:13 by gyepark          ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #include "structure.h"
 #include "vector_operation.h"
 #include "object_pattern.h"
@@ -29,7 +41,7 @@ t_uv	uv_map_plane(t_coord p, t_pl pl)
 	v = fmod(vec_dot(p, e2), 100);
 	u = 100 * (u < 0) + u;
 	v = 100 * (v < 0) + v;
-	return ((t_uv){u / 100,	v / 100,
+	return ((t_uv){u / 100, v / 100,
 		vec_normalize(e1),
 		vec_normalize(e2)});
 }
@@ -60,9 +72,10 @@ t_vec	get_cone_body_norm(t_coord p, t_cn cn)
 	t_coord	x;
 	double	len_top_x;
 	double	theta;
- 
+
 	theta = atan2(cn.diameter / 2, cn.height);
-	len_top_x = vec_len(vec_sub(p, vec_add(p, vec_scale(cn.norm, cn.height)))) / cos(theta);
+	len_top_x = vec_len(vec_sub(p, vec_add(p, vec_scale(cn.norm, cn.height))))
+		/ cos(theta);
 	x = vec_add(cn.coord, vec_scale(cn.norm, cn.height - len_top_x));
 	return (vec_normalize(vec_sub(p, x)));
 }

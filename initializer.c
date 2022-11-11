@@ -1,3 +1,15 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   initializer.c                                      :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: gyepark <gyepark@student.42seoul.kr>       +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2022/11/11 19:55:54 by gyepark           #+#    #+#             */
+/*   Updated: 2022/11/11 19:55:56 by gyepark          ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #include "structure.h"
 #include "constant.h"
 #include <stdlib.h>
@@ -17,9 +29,9 @@ void	convert_color_to_grayscale(t_img *img)
 		while (++i < img->width)
 		{
 			pixel = (i + j * img->width) * 4;
-			color = 0.11 * (unsigned char)img->addr[pixel] +
-				0.59 * (unsigned char)img->addr[pixel + 1] +
-				0.3 * (unsigned char)img->addr[pixel + 2];
+			color = 0.11 * (unsigned char)img->addr[pixel]
+				+ 0.59 * (unsigned char)img->addr[pixel + 1]
+				+ 0.3 * (unsigned char)img->addr[pixel + 2];
 			img->addr[pixel] = color;
 			img->addr[pixel + 1] = color;
 			img->addr[pixel + 2] = color;
@@ -30,11 +42,11 @@ void	convert_color_to_grayscale(t_img *img)
 int	get_new_xpm_image(void *mlx, t_img *img, char *file)
 {
 	img->ptr = mlx_xpm_file_to_image(mlx, file,
-		&img->width, &img->height);
+			&img->width, &img->height);
 	if (!img->ptr)
 		return (0);
 	img->addr = mlx_get_data_addr(img->ptr,
-		&img->bits_per_pixel, &img->line_length, &img->endian);
+			&img->bits_per_pixel, &img->line_length, &img->endian);
 	if (!img->addr)
 		return (0);
 	return (1);

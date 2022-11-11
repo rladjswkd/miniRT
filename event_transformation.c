@@ -1,3 +1,15 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   event_transformation.c                             :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: gyepark <gyepark@student.42seoul.kr>       +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2022/11/11 19:55:37 by gyepark           #+#    #+#             */
+/*   Updated: 2022/11/11 19:55:39 by gyepark          ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #include "structure.h"
 #include "constant.h"
 #include "normal_transformation.h"
@@ -28,8 +40,8 @@ void	rotate_object(t_thread_param *param, int keycode)
 	current_object->lati = latitude;
 	current_object->longi = longitude;
 	current_object->norm = rotate_normal(
-		current_object->norm_const,
-		mat_mul(rotate_longitude(longitude), rotate_latitude(latitude)));
+			current_object->norm_const,
+			mat_mul(rotate_longitude(longitude), rotate_latitude(latitude)));
 }
 
 void	translate_object(t_thread_param *param, int keycode)
@@ -37,17 +49,21 @@ void	translate_object(t_thread_param *param, int keycode)
 	t_obj_info	*current_object;
 	t_camera	camera;
 	t_vec		d_vec;
+	t_vec		vec_x;
+	t_vec		vec_y;
 
 	if (param->vars->obj.type == NONE)
 		return ;
 	current_object = (t_obj_info *)(param->vars->obj.object);
 	camera = param->world->c;
+	vec_x = get_viewport_vec(camera, (t_vec4){-1, 0, 0, 1});
+	vec_y = get_viewport_vec(camera, (t_vec4){0, -1, 0, 1});
 	d_vec = vec_add(
-		vec_add(
-			vec_scale(get_viewport_vec(camera, (t_vec4){-1, 0, 0, 1}), 10 * ((keycode == E) - (keycode == Q))),
-			vec_scale(get_viewport_vec(camera, (t_vec4){0, -1, 0, 1}), 10 * ((keycode == D) - (keycode == A)))
-		), 
-		vec_scale(camera.norm, 10 * ((keycode == W) - (keycode == S))));
+			vec_add(
+				vec_scale(vec_x, 10 * ((keycode == E) - (keycode == Q))),
+				vec_scale(vec_y, 10 * ((keycode == D) - (keycode == A)))
+				),
+			vec_scale(camera.norm, 10 * ((keycode == W) - (keycode == S))));
 	current_object->coord = vec_add(current_object->coord, d_vec);
 }
 
@@ -108,5 +124,5 @@ void	select_non_selectable(t_thread_param *param, int code)
 	else
 		light = light->next;
 	obj->type = LIGHT;
-	obj->object = light->data;	
+	obj->object = light->data;
 }
