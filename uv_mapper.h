@@ -1,0 +1,10 @@
+#ifndef UV_MAPPER_H
+# define UV_MAPPER_H
+# include "structure.h"
+
+t_uv	uv_map_sphere(t_coord p, t_sp sp);
+t_uv	uv_map_plane(t_coord p, t_pl pl);
+t_uv	uv_map_cylinder(t_coord p, t_cy cy);
+t_vec	get_cone_body_norm(t_coord p, t_cn cn);
+t_uv	uv_map_cone(t_coord p, t_cn cn);
+#endif
