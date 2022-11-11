@@ -7,7 +7,6 @@
 #include "converter.h"
 #include "checker.h"
 #include "mlx.h"
-#include <pthread.h>
 
 #define ERROR_MSG	"Error\nSomething went wrong!\n"
 
@@ -15,9 +14,8 @@
 #define SPHERE		1
 #define CYLINDER	2
 #define PLANE		3
-#define CONE		4
-#define CAMERA		5
-#define LIGHT		6
+#define CAMERA		4
+#define LIGHT		5
 #define SHADOW_BIAS 1.00001
 #define ESC_KEY		53
 #define LEFT		123
@@ -25,17 +23,8 @@
 #define RIGHT		124
 #define DOWN		125
 
-#define BUMP_HIGHT_WEIGHT	100
-#define COLOR_IMG	"bump.xpm"
-#define BUMP_IMG	"bump3.xpm"
-
-#define CHECKER		1
-#define IMAGE		2
-#define BUMP		4
-
 #define WIDTH 		1280
 #define HEIGHT		720
-#define THREAD		12
 #define ANGLE		10
 
 #define	MOUSE_LEFT	1
@@ -51,10 +40,6 @@
 #define TWO			19 // linux 50, mac 19 rotate backward
 #define THREE		20 // linux 51, mac 20 choose rotate circle forward
 #define FOUR		21 // linux 52, mac 21 choose rotate circle backward
-
-#define C			8 // linux
-#define B			11 // linux
-#define I			34 // linux
 
 #define K			40 // linux , mac 40 select camera
 #define L			37 // linux , mac 37 select light
@@ -103,7 +88,7 @@ typedef struct s_coordinate
 	double	z;
 }	t_coord;
 
-typedef	t_coord	t_vec;
+typedef t_coord	t_vec;
 
 typedef struct s_obj_info
 {
@@ -142,7 +127,6 @@ typedef struct s_sphere
 	t_coord	coord;
 	double	diameter;
 	t_rgb	rgb;
-	int		status;
 }	t_sp;
 
 typedef struct s_plane
@@ -153,7 +137,6 @@ typedef struct s_plane
 	int		longi;
 	t_vec	norm_const;
 	t_rgb	rgb;
-	int		status;
 }	t_pl;
 
 typedef struct s_cylinder
@@ -166,10 +149,7 @@ typedef struct s_cylinder
 	double	diameter;
 	double	height;
 	t_rgb	rgb;
-	int		status;
 }	t_cy;
-
-typedef t_cy	t_cn;
 
 typedef struct s_node
 {
@@ -181,11 +161,10 @@ typedef struct s_world
 {
 	t_ambient	a;
 	t_camera	c;
-	t_node		*l;
+	t_light		l;
 	t_node		*sp;
 	t_node		*cy;
 	t_node		*pl;
-	t_node		*cn;
 }	t_world;
 
 typedef struct s_ray
@@ -235,20 +214,15 @@ typedef struct s_vars
 	void		*mlx;
 	void		*win;
 	t_img		img;
-	t_img		c_img;
-	t_img		b_img;
-	char		*b_map; // remove
 	t_obj		obj;
 }	t_vars;
 
-typedef struct s_thread_param
+typedef struct s_param
 {
 	t_vars		*vars;
 	t_world		*world;
 	t_viewport	viewport;
-	int			index;
-	pthread_t	thread_id;
-}	t_thread_param;
+}	t_param;
 
 t_mat	rotate_latitude(int);
 t_mat	rotate_longitude(int);
@@ -256,11 +230,9 @@ void	clear_list(t_node **);
 
 void	destroy_world(t_world *world)
 {
-	clear_list(&(world->l));
 	clear_list(&(world->sp));
 	clear_list(&(world->pl));
 	clear_list(&(world->cy));
-	clear_list(&(world->cn));	
 }
 
 void	destroy_mlx(t_vars *vars)
@@ -270,7 +242,7 @@ void	destroy_mlx(t_vars *vars)
 	free(vars->mlx);
 }
 
-void	exit_minirt(char *msg, t_world *world, t_vars *vars, t_thread_param *param)
+void	exit_minirt(char *msg, t_world *world, t_vars *vars)
 {
 	int	exit_status;
 
@@ -284,7 +256,6 @@ void	exit_minirt(char *msg, t_world *world, t_vars *vars, t_thread_param *param)
 		destroy_world(world);
 	if (vars)
 		destroy_mlx(vars);
-	free(param);
 	exit(exit_status);
 }
 
@@ -298,43 +269,6 @@ int	check_rgb(t_rgb rgb)
 	g = rgb.g;
 	b = rgb.b;
 	return (-1 < r && r < 256 && -1 < g && g < 256 && -1 < b && b < 256);
-}
-
-void	convert_color_to_grayscale(t_img *img)
-{
-	int				i;
-	int				j;
-	unsigned char	color;
-	int				pixel;
-
-	j = -1;
-	while (++j < img->height)
-	{
-		i = -1;
-		while (++i < img->width)
-		{
-			pixel = (i + j * img->width) * 4;
-			color = 0.11 * (unsigned char)img->addr[pixel] + \
-			0.59 * (unsigned char)img->addr[pixel + 1] + \
-			0.3 * (unsigned char)img->addr[pixel + 2];
-			img->addr[pixel] = color;
-			img->addr[pixel + 1] = color;
-			img->addr[pixel + 2] = color;
-		}
-	}
-}
-
-int	get_new_xpm_image(void *mlx, t_img *img, char *file)
-{
-	img->ptr = mlx_xpm_file_to_image(mlx, file, \
-					&img->width, &img->height);
-	if (!img->ptr)
-		return (0);
-	img->addr = mlx_get_data_addr(img->ptr, \
-	&img->bits_per_pixel, &img->line_length, &img->endian);
-	if (!img->addr)
-		return (0);
-	return (1);
 }
 
 int	init_mlx_pointers(t_vars *vars)
@@ -352,11 +286,6 @@ int	init_mlx_pointers(t_vars *vars)
 			&vars->img.line_length, &vars->img.endian);
 	if (!vars->img.addr)
 		return (0);
-	if (!get_new_xpm_image(vars->mlx, &vars->c_img, COLOR_IMG))
-		return (0);
-	if (!get_new_xpm_image(vars->mlx, &vars->b_img, BUMP_IMG))
-		return (0);
-	convert_color_to_grayscale(&vars->b_img);
 	vars->obj.type = NONE;
 	vars->obj.object = 0;
 	vars->obj.t = 0;
@@ -455,7 +384,7 @@ int	set_light(char **info, int cnt, t_world *world)
 
 	if (cnt != 4)
 		return (0);
-	l = (t_light *)(get_last_node(world->l)->data);
+	l = &(world->l);
 	if (!set_coordinate(info[1], &(l->coord)))
 		return (0);
 	if (!get_double(info[2], &intensitiy) || intensitiy < 0 || 1 < intensitiy)
@@ -502,7 +431,6 @@ int	set_plane(char **info, int cnt, t_world *world)
 		return (0);
 	if (!set_rgb(info[3], &(pl->rgb)))
 		return (0);
-	pl->status = 0;
 	pl->longi = 0;
 	pl->lati = 0;
 	pl->norm_const = pl->norm;
@@ -524,7 +452,6 @@ int	set_sphere(char **info, int cnt, t_world *world)
 	if (!set_rgb(info[3], &(sp->rgb)))
 		return (0);
 	sp->diameter = diameter;
-	sp->status = 0;
 	return (1);
 }
 
@@ -553,49 +480,9 @@ int	set_cylinder(char **info, int cnt, t_world *world)
 	cy->norm_const = cy->norm;
 	cy->diameter = diameter;
 	cy->height = height;
-	cy->status = 0;
 	return (1);
 }
 
-int	set_cone(char **info, int cnt, t_world *world)
-{
-	double	diameter;
-	double	height;
-	t_cn	*cn;
-
-	if (cnt != 6)
-		return (0);
-	cn = (t_cn *)(get_last_node(world->cn)->data);
-	if (!set_coordinate(info[1], &(cn->coord)))
-		return (0);
-	if (!set_coordinate(info[2], &(cn->norm))
-		|| !check_normal(cn->norm))
-		return (0);
-	if (!get_double(info[3], &diameter) || diameter < 0)
-		return (0);
-	if (!get_double(info[4], &height) || height < 0)
-		return (0);
-	if (!set_rgb(info[5], &(cn->rgb)))
-		return (0);
-	cn->lati = 0;
-	cn->longi = 0;
-	cn->norm_const = cn->norm;	
-	cn->diameter = diameter;
-	cn->height = height;
-	cn->status = 0;
-	return (1);
-}
-
-int	alloc_light(void **ptr)
-{
-	t_light	*l;
-
-	l = (t_light *)malloc(sizeof(t_light));
-	if (!l)
-		return (0);
-	*ptr = (void *)l;
-	return (1);
-}
 
 int	alloc_sphere(void **ptr){
 	t_sp	*sp;
@@ -627,27 +514,16 @@ int	alloc_cylinder(void **ptr){
 	return (1);
 }
 
-int	alloc_cone(void **ptr)
-{
-	t_cn	*cn;
-
-	cn = (t_cn *)malloc(sizeof(t_cn));
-	if (!cn)
-		return (0);
-	*ptr = (void *)cn;
-	return (1);
-}
-
 int	alloc_new_node(t_node **node, int index)
 {
-	static int	(*allocator[5])(void **)
-		= {alloc_light, alloc_sphere, alloc_plane, alloc_cylinder, alloc_cone};
+	static int	(*allocator[3])(void **)
+		= {alloc_sphere, alloc_plane, alloc_cylinder};
 
 	*node = (t_node *)malloc(sizeof(t_node));
 	if (!(*node))
 		return (0);
 	(*node)->next = 0;
-	if (!(*allocator[index - 2])(&((*node)->data)))
+	if (!(*allocator[index - 3])(&((*node)->data)))
 	{
 		free(*node);
 		return (0);
@@ -688,15 +564,11 @@ int	set_object_list(t_world *rt, int index)
 
 	if (!alloc_new_node(&new_node, index))
 		return (0);
-	objects = &(rt->l);
-	if (index == 3)
-		objects = &(rt->sp);
-	else if (index == 4)
+	objects = &(rt->sp);
+	if (index == 4)
 		objects = &(rt->pl);
 	else if (index == 5)
 		objects = &(rt->cy);
-	else if (index == 6)
-		objects = &(rt->cn);
 	append_node(objects, new_node);
 	return (1);
 }
@@ -711,8 +583,8 @@ int	set_world(char *line, t_world *rt, int *mask)
 	char		**splitted;
 	int			cnt;
 	int			index;
-	static int	(*fp[7])(char **, int, t_world *) = {set_ambient, set_camera,
-		set_light, set_sphere, set_plane, set_cylinder, set_cone};
+	static int	(*fp[6])(char **, int, t_world *) = {set_ambient, set_camera,
+		set_light, set_sphere, set_plane, set_cylinder};
 	
 	splitted = split_line(line, ' ', &cnt); // all split_lines need null-guard.
 	if (!(splitted && splitted[0]))
@@ -720,10 +592,10 @@ int	set_world(char *line, t_world *rt, int *mask)
 	index = check_identifier(splitted[0]);
 	if (index == -1)
 		return (free_splitted(splitted, 0)); // caller must print error if set_world returns 0.
-	if (index < 2 && (*mask & 1 << index || !(*fp[index])(splitted, cnt, rt))) // A, C, L shouldn't be on mutiple lines and don't need malloc.
+	if (index < 3 && (*mask & 1 << index || !(*fp[index])(splitted, cnt, rt))) // A, C, L shouldn't be on mutiple lines and don't need malloc.
 		return (free_splitted(splitted, 0));
 	*mask |= 1 << index;
-	if (1 < index
+	if (2 < index
 		&& (!set_object_list(rt, index)	|| !(*fp[index])(splitted, cnt, rt)))
 		return (free_splitted(splitted, 0));
 	return (free_splitted(splitted, 1));
@@ -1162,57 +1034,6 @@ int	intersect_plane(t_ray ray, t_pl pl, double *t) //rename this to get_plane_t
 	return (*t > 1);
 }
 
-void	cal_cn_body(t_ray ray, t_cn cn, t_inter *inter)
-{
-	t_equation	eq;
-	t_vec		vec_dir;
-	t_vec		vec_pos;
-	t_vec		cn_ray;
-	double		theta;
-
-	theta = pow((cn.diameter / 2.0) / cn.height, 2);
-	vec_dir = vec_sub(ray.dir, vec_scale(cn.norm, vec_dot(ray.dir, cn.norm)));
-	cn_ray = vec_sub(ray.pos, vec_add(cn.coord, vec_scale(cn.norm, cn.height)));
-	vec_pos = vec_sub(cn_ray, vec_scale(cn.norm, vec_dot(cn_ray, cn.norm)));
-	eq.a = vec_dot(vec_dir, vec_dir) - theta * pow(vec_dot(ray.dir, cn.norm), 2);
-	eq.b = 2.0 * vec_dot(vec_dir, vec_pos) - \
-		2.0 * theta * vec_dot(ray.dir, cn.norm) * vec_dot(cn_ray, cn.norm);
-	eq.c = vec_dot(vec_pos, vec_pos) - theta * pow(vec_dot(cn_ray, cn.norm), 2);
-	solve_equation(eq, inter);
-}
-
-void	cal_cn_caps(t_ray ray, t_cn cn, double *t3)
-{
-	double	n_dot_dir;
-
-	n_dot_dir = vec_dot(cn.norm, ray.dir);
-	*t3 = vec_dot(cn.norm, vec_sub(cn.coord, ray.pos)) / n_dot_dir;
-}
-
-int	is_valid_cn_t3(t_cn cn, t_ray ray, double t)
-{
-	t_vec	q_to_cap;
-
-	q_to_cap = vec_sub(vec_add(ray.pos, vec_scale(ray.dir, t)),
-		cn.coord);
-	return (t > 1 && vec_dot(q_to_cap, q_to_cap) < pow(cn.diameter / 2, 2));
-}
-
-int	intersect_cone(t_ray ray, t_cn cn, double *t)
-{
-	t_inter		t_1_2;
-	double		t3;
-	double		ret;
-
-	cal_cn_body(ray, cn, &t_1_2);
-	cal_cn_caps(ray, cn, &t3);
-	ret = choose_smaller_t(HUGE_VAL, t_1_2.l, is_valid_t1t2(cn, ray, t_1_2.l));
-	ret = choose_smaller_t(ret, t_1_2.r, is_valid_t1t2(cn, ray, t_1_2.r));
-	ret = choose_smaller_t(ret, t3, is_valid_cn_t3(cn, ray, t3));
-	*t = ret;
-	return (ret != HUGE_VAL);
-}
-
 void	check_sp(t_ray ray, t_node *sp, t_obj *obj)
 {
 	double	cur;
@@ -1276,27 +1097,6 @@ void	check_pl(t_ray ray, t_node *pl, t_obj *obj)
 	obj->t = t;
 }
 
-void	check_cn(t_ray ray, t_node *cn, t_obj *obj)
-{
-	double	cur;
-	double	t;
-
-	if (!cn)
-		return ;
-	t = obj->t;
-	while (cn)
-	{
-		if (intersect_cone(ray, *((t_cn *)(cn->data)), &cur) && cur < t)
-		{
-			t = cur;
-			obj->type = CONE;
-			obj->object = (t_cn *)(cn->data);
-		}
-		cn = cn->next;
-	}
-	obj->t = t;
-}
-
 int	intersect(t_ray ray, t_world world, t_obj *obj)
 {
 	obj->type = NONE;
@@ -1304,7 +1104,6 @@ int	intersect(t_ray ray, t_world world, t_obj *obj)
 	check_sp(ray, world.sp, obj);
 	check_cy(ray, world.cy, obj);
 	check_pl(ray, world.pl, obj);
-	check_cn(ray, world.cn, obj);
 	return (obj->type);
 }
 
@@ -1337,22 +1136,6 @@ int	check_shadow_cy(t_ray ray, t_node *cy)
 		if (intersect_cylinder(ray, *((t_cy *)(cy->data)), &cur) && cur < 2)
 			return (1);
 		cy = cy->next;
-	}
-	return (0);
-}
-
-int	check_shadow_cn(t_ray ray, t_node *cn)
-{
-	double	cur;
-
-	cur = 2;
-	if (!cn)
-		return (0);
-	while (cn)
-	{
-		if (intersect_cone(ray, *((t_cn *)(cn->data)), &cur) && cur < 2)
-			return (1);
-		cn = cn->next;
 	}
 	return (0);
 }
@@ -1391,8 +1174,6 @@ int	check_shadow(t_world world, t_ray l_ray)
 		return (1);
 	if (check_shadow_pl(l_ray, world.pl))
 		return (1);
-	if (check_shadow_cn(l_ray, world.cn))
-		return (1);
 	return (0);
 }
 
@@ -1421,45 +1202,17 @@ t_vec	compute_diffuse(t_vec inter, t_vec n, t_light light)
 	return (ret);
 }
 
-t_vec	compute_specular(t_vec inter, t_vec n, t_vec v, t_light light)
-{
-	t_vec	ret;
-	t_vec	l;
-	t_vec	r;
-	double	r_dot_v;
-
-	ret = (t_vec){0, 0, 0};
-	l = vec_normalize(vec_sub(light.coord, inter));
-	r = vec_sub(vec_neg(l), vec_scale(n, 2.0 * vec_dot(n, vec_neg(l))));
-	r_dot_v = vec_dot(v, r);
-	if (r_dot_v > 0)
-		ret = vec_scale(rgb_to_vec(light.rgb), \
-			light.intensity * pow(r_dot_v, S_EXP));
-	return (ret);
-}
-
-t_vec	compute_lighting(t_vec inter, t_vec n, t_vec v, t_world world) // only for diffuse reflection, p_norm should be an unit vector
+t_vec	compute_lighting(t_vec inter, t_vec n, t_world world) // only for diffuse reflection, p_norm should be an unit vector
 {
 	t_vec	v_ambient;
 	t_vec	v_diffuse;
-	t_vec	v_specular;
 	t_vec	lighting;
-	t_node	*l;
 
-	l = world.l;
 	v_ambient = vec_scale(rgb_to_vec(world.a.rgb), world.a.intensity);
 	v_diffuse = (t_vec){0, 0, 0};
-	v_specular = (t_vec){0, 0, 0};
-	while (l)
-	{	
-		if (!check_shadow(world, get_l_ray(*(t_light *)l->data, inter)))
-		{
-			v_diffuse = vec_add(v_diffuse, compute_diffuse(inter, n, *(t_light *)l->data));
-			v_specular = vec_add(v_specular, compute_specular(inter, n, v, *(t_light *)l->data));
-		}
-		l = l->next;
-	}
-	lighting = vec_add(vec_add(v_ambient, v_diffuse), v_specular);
+	if (!check_shadow(world, get_l_ray(world.l, inter)))
+		v_diffuse = compute_diffuse(inter, n, world.l);
+	lighting = vec_add(v_ambient, v_diffuse);
 	lighting.x -= (lighting.x > 1.0) * (lighting.x - 1.0);
 	lighting.y -= (lighting.y > 1.0) * (lighting.y - 1.0);
 	lighting.z -= (lighting.z > 1.0) * (lighting.z - 1.0);
@@ -1526,38 +1279,6 @@ t_uv	uv_map_cylinder(t_coord p, t_cy cy)
 	uv.pu = vec_normalize(vec_cross(n_p, get_basis_vec(n_p)));
 	uv.pv = vec_normalize(vec_cross(n_p, uv.pu));
 	return (uv);
-}
-
-t_vec	get_cone_body_norm(t_coord p, t_cn cn)
-{
-	t_coord	x;
-	double	len_top_x;
-	double	theta;
- 
-	theta = atan2(cn.diameter / 2, cn.height);
-	len_top_x = vec_len(vec_sub(p, vec_add(p, vec_scale(cn.norm, cn.height)))) / cos(theta);
-	x = vec_add(cn.coord, vec_scale(cn.norm, cn.height - len_top_x));
-	return (vec_normalize(vec_sub(p, x)));
-}
-
-t_uv	uv_map_cone(t_coord p, t_cn cn)
-{
-	t_uv	ret;
-	t_vec	n_p;
-
-	ret = uv_map_cylinder(p, (t_cy)cn);
-	n_p = get_cone_body_norm(p, cn);
-	ret.pu = vec_normalize(vec_cross(n_p, get_basis_vec(n_p)));
-	ret.pv = vec_normalize(vec_cross(n_p, ret.pu));
-	return (ret);
-}
-
-// u, v are in [0, 1]
-char	uv_pattern_at(t_uv uv, int w, int h)
-{
-	if (((int)floor(uv.u * w) + (int)floor(uv.v * h)) % 2)
-		return (1);
-	return (0);
 }
 
 int	open_file(char *path)
@@ -1669,123 +1390,37 @@ t_ray	generate_ray(t_coord pos, t_viewport viewport, int i, int j)
 	return (ret);
 }
 
-t_rgb	get_img_rgb(t_img img, t_uv uv)
+t_rgb	get_sp_rgb(void *object)
 {
-	int	i;
-  
-	i = img.width * uv.u + ((int)(img.height * uv.v)) * img.width;
-	i *= 4;
-	return ((t_rgb){(unsigned char)img.addr[i + 2], \
-		(unsigned char)img.addr[i + 1], (unsigned char)img.addr[i]});
-}
-
-t_rgb	get_sp_rgb(t_img img, void *object, t_coord p)
-{
-	t_uv	uv;
 	t_sp	*sp;
 
 	sp = object;
-	if ((sp->status & CHECKER))
-	{
-		uv = uv_map_sphere(p, *sp);
-		if (uv_pattern_at(uv, 16, 16))
-		{
-			if (sp->status & IMAGE)
-				return (get_img_rgb(img, uv));
-			return (sp->rgb);
-		}
-		return ((t_rgb){255, 255, 255});
-	}
-	if (sp->status & IMAGE)
-	{
-		uv = uv_map_sphere(p, *sp);
-		return (get_img_rgb(img, uv));
-	}
 	return (sp->rgb);
 }
 
-t_rgb	get_pl_rgb(t_img img, void *object, t_coord p)
+t_rgb	get_pl_rgb(void *object)
 {
-	t_uv	uv;
 	t_pl	*pl;
 
 	pl = object;
-	if ((pl->status & CHECKER))
-	{
-		uv = uv_map_plane(p, *pl);
-		if (uv_pattern_at(uv, 16, 16))
-		{
-			if (pl->status & IMAGE)
-				return (get_img_rgb(img, uv));
-			return (pl->rgb);
-		}
-		return ((t_rgb){255, 255, 255});
-	}
-	if (pl->status & IMAGE)
-	{
-		uv = uv_map_plane(p, *pl);
-		return (get_img_rgb(img, uv));
-	}
 	return (pl->rgb);
 }
 
-t_rgb	get_cy_rgb(t_img img, void *object, t_coord p)
+t_rgb	get_cy_rgb(void *object)
 {
-	t_uv	uv;
 	t_cy	*cy;
 
 	cy = object;
-	if ((cy->status & CHECKER))
-	{
-		uv = uv_map_cylinder(p, *cy);
-		if (uv_pattern_at(uv, 16, 8))
-		{
-			if (cy->status & IMAGE)
-				return (get_img_rgb(img, uv));
-			return (cy->rgb);
-		}
-		return ((t_rgb){255, 255, 255});
-	}
-	if (cy->status & IMAGE)
-	{
-		uv = uv_map_cylinder(p, *cy);
-		return (get_img_rgb(img, uv));
-	}
 	return (cy->rgb);
 }
 
-t_rgb	get_cn_rgb(t_img img, void *object, t_coord p)
-{
-	t_uv	uv;
-	t_cn	*cn;
-
-	cn = object;
-	if ((cn->status & CHECKER))
-	{
-		uv = uv_map_cone(p, *cn);
-		if (uv_pattern_at(uv, 16, 16))
-		{
-			if (cn->status & IMAGE)
-				return (get_img_rgb(img, uv));
-			return (cn->rgb);
-		}
-		return ((t_rgb){255, 255, 255});
-	}
-	if (cn->status & IMAGE)
-	{
-		uv = uv_map_cone(p, *cn);
-		return (get_img_rgb(img, uv));
-	}
-	return (cn->rgb);
-}
-
-t_rgb	get_obj_rgb(t_vars *vars, t_obj obj, t_coord p, t_vec lighting)
+t_rgb	get_obj_rgb(t_obj obj, t_vec lighting)
 {
 	t_rgb			ret;
-	static t_rgb	(*fp[4])(t_img, void *, t_coord) = {get_sp_rgb, \
-		get_cy_rgb, get_pl_rgb, get_cn_rgb};
+	static t_rgb	(*fp[3])(void *) = {get_sp_rgb, \
+		get_cy_rgb, get_pl_rgb};
 
-	ret = (*fp[obj.type - 1])(vars->c_img, obj.object, p);
+	ret = (*fp[obj.type - 1])(obj.object);
 	return (mult_rgb_vec(ret, lighting));
 }
 
@@ -1843,33 +1478,6 @@ t_vec	get_tangent_norm_pl(t_pl *pl, t_vec ray_dir)
 	return (pl->norm);
 }
 
-t_vec	get_tangent_norm_cn(t_cn *cn, t_coord p, t_vec ray_dir)
-{
-	double	a;
-	double	b;
-	t_vec	ret;
-
-	a = vec_dot(p, cn->norm);
-	b = vec_dot(vec_add(cn->coord, vec_scale(cn->norm, cn->height)), cn->norm);
-	if (fabs(a - b) < 1e-6)
-	{
-		if (vec_dot(ray_dir, cn->norm) > 0)
-			return (vec_scale(cn->norm, -1));
-		return (cn->norm);
-	}
-	b = vec_dot(cn->coord, cn->norm);
-	if (fabs(a - b) < 1e-6)
-	{
-		if (vec_dot(ray_dir, cn->norm) > 0)
-			return (vec_scale(cn->norm, -1));
-		return (cn->norm);
-	}
-	ret = get_cone_body_norm(p, *cn);
-	if (vec_dot(ray_dir, ret) > 0)
-		return (vec_scale(ret, -1));
-	return (ret);
-}
-
 t_vec	get_tangent_norm(t_obj obj, t_coord p, t_vec ray_dir)
 {
 	t_vec	n;
@@ -1881,47 +1489,7 @@ t_vec	get_tangent_norm(t_obj obj, t_coord p, t_vec ray_dir)
 		n = get_tangent_norm_cy(obj.object, p, ray_dir);
 	else if (obj.type == PLANE)
 		n = get_tangent_norm_pl(obj.object, ray_dir);
-	else if (obj.type == CONE)
-		n = get_tangent_norm_cn(obj.object, p, ray_dir);
 	return (n);
-}
-
-t_vec	get_bump_norm(t_vars *vars, t_obj obj, t_vec p, t_vec n)
-{
-	t_vec	ret;
-	t_uv	uv;
-	int		i;
-	double	bu;
-	double	bv;
-
-	ret = (t_vec){0, 0, 0};
-	if (obj.type == SPHERE)
-		uv = uv_map_sphere(p, *(t_sp *)obj.object);
-	else if (obj.type == CYLINDER)
-		uv = uv_map_cylinder(p, *(t_cy *)obj.object);
-	else if (obj.type == PLANE)
-		uv = uv_map_plane(p, *(t_pl *)obj.object);
-	else if (obj.type == CONE)
-		uv = uv_map_cone(p, *(t_cn *)obj.object);
-	i = vars->b_img.width * uv.u + (int)(vars->b_img.height * uv.v) * vars->b_img.width;
-	bu = vars->b_img.addr[i * 4] - vars->b_img.addr[(i + 1) * 4];
-	bv = vars->b_img.addr[i * 4] - vars->b_img.addr[(vars->b_img.width + i) * 4];
-	bu /= BUMP_HIGHT_WEIGHT;
-	bv /= BUMP_HIGHT_WEIGHT;
-	ret = vec_sub(vec_scale(vec_cross(n, uv.pv), bu), \
-			vec_scale(vec_cross(n, uv.pu), bv));
-	return (vec_normalize(vec_add(n, ret)));
-}
-
-int	get_status(int	type, void *object)
-{
-	if (type == SPHERE)
-		return ((t_sp *)object)->status;
-	if (type == CYLINDER)
-		return ((t_cy *)object)->status;
-	if (type == PLANE)
-		return ((t_pl *)object)->status;
-	return ((t_cn *)object)->status;
 }
 
 int	trace_ray(t_vars *vars, t_world *world, t_ray ray, int i)
@@ -1932,87 +1500,51 @@ int	trace_ray(t_vars *vars, t_world *world, t_ray ray, int i)
 	t_vec	n;
 
 	if (!intersect(ray, *world, &obj))
-    color = (t_rgb){0, 0, 0}; //background color
-  else
-  {
-  	p = vec_add(ray.pos, vec_scale(ray.dir, obj.t));
-	  n = get_tangent_norm(obj, p, ray.dir);
-	  if (get_status(obj.type, obj.object) & BUMP)
-	  	n = get_bump_norm(vars, obj, p, n);
-	  color = get_obj_rgb(vars, obj, p,
-	  	compute_lighting(p, n, vec_neg(vec_normalize(ray.dir)), *world));
-  }
+	color = (t_rgb){0, 0, 0};
+	else
+	{
+		p = vec_add(ray.pos, vec_scale(ray.dir, obj.t));
+		n = get_tangent_norm(obj, p, ray.dir);
+		color = get_obj_rgb(obj,
+		compute_lighting(p, n, *world));
+	}
 	dot_pixel(&vars->img, color, i);
 	return (0);
 }
 /////////////////////////////////////////////////////
 
-void	*drawing(void *b_param)
+
+int draw_img(t_world *world, t_vars *vars)
 {
-	t_thread_param	param;
+	t_viewport	viewport;
 	t_ray			ray;
 	int				i;
 	int				j;
-
-	param = *(t_thread_param *)b_param;
-	j = param.index * (HEIGHT / THREAD) - 1;
-	while (++j < (param.index + 1) * (HEIGHT / THREAD))
-	{
-		i = -1;
-		while (++i < WIDTH)
-		{
-			ray = generate_ray(param.world->c.coord, param.viewport, i, j);
-			trace_ray(param.vars, param.world, ray, j * WIDTH + i);
-		}
-	}
-	return (0);
-}
-
-int draw_img(t_thread_param *param)
-{
-	t_viewport	viewport;
-  	t_vars		*vars;
-	void		*tmp;
-	int			i;
 /////////////////////// key_press_handler doesn't change world's value.
 	// t_camera c = world->c;
 	// print_vector("normal: ", c.norm);
 	// print_vector("coordinate: ", c.coord);
 ///////////////////////
-	vars = param->vars;
-	viewport = generate_viewport(param->world->c);
-	i = -1;
-	while (++i < THREAD)
+	viewport = generate_viewport(world->c);
+	j = -1;
+	while (++j < HEIGHT)
 	{
-		param[i].viewport = viewport;
-		if (pthread_create(&(param[i].thread_id), NULL, drawing, param + i))
-			return (0);
+		i = -1;
+		while (++i < WIDTH)
+		{
+			ray = generate_ray(world->c.coord, viewport, i, j);
+			trace_ray(vars, world, ray, j * WIDTH + i);
+		}
 	}
-	i = -1;
-	while (++i < THREAD)
-		pthread_join(param[i].thread_id, &tmp);
 	mlx_put_image_to_window(vars->mlx, vars->win, vars->img.ptr, 0, 0);
 	return (1);
 }
 
 
-int	create_thread_param(t_world *world, t_vars *vars, t_thread_param **param)
+void	init_param(t_world *world, t_vars *vars, t_param *param)
 {
-	t_thread_param	*ret;
-	int				i;
-
-	ret = (t_thread_param *)malloc(sizeof(t_thread_param) * THREAD);
-	if (ret == NULL)
-		return (0);
-	i = -1;
-	while (++i < THREAD)
-	{
-		ret[i].vars = vars;
-		ret[i].world = world;
-		ret[i].index = i;
-	}
-	*param = ret;
-	return (1);
+	param->vars = vars;
+	param->world = world;
 }
 
 t_mat	rotate_latitude(int angle)
@@ -2023,62 +1555,6 @@ t_mat	rotate_latitude(int angle)
 	return (mat_rx(cos(rad), sin(rad)));
 }
 
-int	*get_p_status(int type, void *object)
-{
-	if (type == SPHERE)
-		return (&((t_sp *)object)->status);
-	if (type == CYLINDER)
-		return (&((t_cy *)object)->status);
-	if (type == PLANE)
-		return (&((t_pl *)object)->status);
-	return (&((t_cn *)object)->status);
-}
-
-void	apply_checker(t_obj obj)
-{
-	int	*status;
-	int	type;
-
-	type = obj.type;
-	if (type == NONE || type == CAMERA || type == LIGHT)
-		return ;
-	status = get_p_status(obj.type, obj.object);
-	if (*status & CHECKER)
-		*status -= CHECKER;
-	else
-		*status += CHECKER;
-}
-
-void	apply_bump(t_obj obj)
-{
-	int	*status;
-	int	type;
-
-	type = obj.type;
-	if (type == NONE || type == CAMERA || type == LIGHT)
-		return ;
-	status = get_p_status(obj.type, obj.object);
-	if (*status & BUMP)
-		*status -= BUMP;
-	else
-		*status += BUMP;
-}
-
-void	apply_img(t_obj obj)
-{
-	int	*status;
-	int	type;
-
-	type = obj.type;
-	if (type == NONE || type == CAMERA || type == LIGHT)
-		return ;
-	status = get_p_status(obj.type, obj.object);
-	if (*status & IMAGE)
-		*status -= IMAGE;
-	else
-		*status += IMAGE;
-}
-
 t_mat	rotate_longitude(int angle)
 {
 	double	rad;
@@ -2087,7 +1563,7 @@ t_mat	rotate_longitude(int angle)
 	return (mat_ry(cos(rad), sin(rad)));
 }
 
-void	rotate_object(t_thread_param *param, int keycode)
+void	rotate_object(t_param *param, int keycode)
 {
 	t_obj		obj;
 	t_obj_info	*current_object;
@@ -2113,7 +1589,7 @@ void	rotate_object(t_thread_param *param, int keycode)
 		mat_mul(rotate_longitude(longitude), rotate_latitude(latitude)));
 }
 
-void	translate_object(t_thread_param *param, int keycode)
+void	translate_object(t_param *param, int keycode)
 {
 	t_obj_info	*current_object;
 	t_camera	camera;
@@ -2132,7 +1608,7 @@ void	translate_object(t_thread_param *param, int keycode)
 	current_object->coord = vec_add(current_object->coord, d_vec);
 }
 
-void	resize_diameter(t_thread_param *param, int code)
+void	resize_diameter(t_param *param, int code)
 {
 	t_obj	obj;
 	int		type;
@@ -2144,8 +1620,6 @@ void	resize_diameter(t_thread_param *param, int code)
 		diameter = &(((t_sp *)(obj.object))->diameter);
 	else if (type == CYLINDER)
 		diameter = &(((t_cy *)(obj.object))->diameter);
-	else if (type == CONE)
-		diameter = &(((t_cn *)(obj.object))->diameter);
 	else
 		return ;
 	*diameter += (code == UP) - (code == DOWN);
@@ -2153,7 +1627,7 @@ void	resize_diameter(t_thread_param *param, int code)
 		*diameter = 1.0;
 }
 
-void	resize_height(t_thread_param *param, int code)
+void	resize_height(t_param *param, int code)
 {
 	t_obj	obj;
 	int		type;
@@ -2163,8 +1637,6 @@ void	resize_height(t_thread_param *param, int code)
 	type = obj.type;
 	if (type == CYLINDER)
 		height = &(((t_cy *)(obj.object))->height);
-	else if (type == CONE)
-		height = &(((t_cn *)(obj.object))->height);
 	else
 		return ;
 	*height += (code == RIGHT) - (code == LEFT);
@@ -2172,10 +1644,9 @@ void	resize_height(t_thread_param *param, int code)
 		*height = 1.0;
 }
 
-void	select_non_selectable(t_thread_param *param, int code)
+void	select_non_selectable(t_param *param, int code)
 {
 	t_obj			*obj;
-	static t_node	*light;
 
 	obj = &(param->vars->obj);
 	if (code == K)
@@ -2184,21 +1655,17 @@ void	select_non_selectable(t_thread_param *param, int code)
 		obj->object = &(param->world->c);
 		return ;
 	}
-	if (light == NULL || light->next == NULL)
-		light = param->world->l;
-	else
-		light = light->next;
 	obj->type = LIGHT;
-	obj->object = light->data;	
+	obj->object = &param->world->l;	
 }
 
-int	exit_handler(t_thread_param *param)
+int	exit_handler(t_param *param)
 {
-	exit_minirt(0, param->world, param->vars, param);
+	exit_minirt(0, param->world, param->vars);
 	return (0);
 }
 
-int	key_press_handler(int code, t_thread_param *param)
+int	key_press_handler(int code, t_param *param)
 {
 	t_vars	*vars;
 
@@ -2216,17 +1683,11 @@ int	key_press_handler(int code, t_thread_param *param)
 		resize_diameter(param, code);
 	else if (code == LEFT || code == RIGHT)
 		resize_height(param, code);
-	else if (code == C)
-		apply_checker(vars->obj);
-	else if (code == B)
-		apply_bump(vars->obj);
-	else if (code == I)
-		apply_img(vars->obj);
-	draw_img(param);
+	draw_img(param->world, vars);
 	return (0);
 }
 
-int	mouse_handler(int button, int x, int y, t_thread_param *param)
+int	mouse_handler(int button, int x, int y, t_param *param)
 {
 	t_ray		ray;
 	t_camera	c;
@@ -2241,11 +1702,9 @@ int	mouse_handler(int button, int x, int y, t_thread_param *param)
 
 void	init_world(t_world *world)
 {
-	world->l = 0;
 	world->sp = 0;
 	world->pl = 0;
 	world->cy = 0;
-	world->cn = 0;
 }
 
 void	foo(void)
@@ -2258,25 +1717,25 @@ int	main(int argc, char **argv)
 	int				fd;
 	t_vars			vars;
 	t_world			world;
-	t_thread_param	*param;
+	t_param			param;
 
 	if (argc != 2)
-		exit_minirt(ERROR_MSG, 0, 0, 0);
+		exit_minirt(ERROR_MSG, 0, 0);
 	fd = open_file(argv[1]);
 	if (fd < 0)
-		exit_minirt(ERROR_MSG, 0, 0, 0);
+		exit_minirt(ERROR_MSG, 0, 0);
 	init_world(&world);
 	if (!read_file(fd, &world))
-		exit_minirt(ERROR_MSG, &world, 0, 0);
+		exit_minirt(ERROR_MSG, &world, 0);
 	if (!init_mlx_pointers(&vars))
-		exit_minirt(ERROR_MSG, &world, &vars, 0);
-	if (!create_thread_param(&world, &vars, &param) || !draw_img(param))
-		exit_minirt(ERROR_MSG, &world, &vars, param);
+		exit_minirt(ERROR_MSG, &world, &vars);
+	init_param(&world, &vars, &param);
+	draw_img(&world, &vars);
 	atexit(foo);
-	select_non_selectable(param, K);
-	mlx_key_hook(vars.win, key_press_handler, param);
-	mlx_mouse_hook(vars.win, mouse_handler, param);
-	mlx_hook(vars.win, 17, 0, exit_handler, param);
+	select_non_selectable(&param, K);
+	mlx_key_hook(vars.win, key_press_handler, &param);
+	mlx_mouse_hook(vars.win, mouse_handler, &param);
+	mlx_hook(vars.win, 17, 0, exit_handler, &param);
 	mlx_loop(vars.mlx);
 	return (0);
 }
