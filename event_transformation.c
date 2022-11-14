@@ -79,8 +79,6 @@ void	resize_diameter(t_thread_param *param, int code)
 		diameter = &(((t_sp *)(obj.object))->diameter);
 	else if (type == CYLINDER)
 		diameter = &(((t_cy *)(obj.object))->diameter);
-	else if (type == CONE)
-		diameter = &(((t_cn *)(obj.object))->diameter);
 	else
 		return ;
 	*diameter += (code == UP) - (code == DOWN);
@@ -98,8 +96,6 @@ void	resize_height(t_thread_param *param, int code)
 	type = obj.type;
 	if (type == CYLINDER)
 		height = &(((t_cy *)(obj.object))->height);
-	else if (type == CONE)
-		height = &(((t_cn *)(obj.object))->height);
 	else
 		return ;
 	*height += (code == RIGHT) - (code == LEFT);
@@ -110,7 +106,6 @@ void	resize_height(t_thread_param *param, int code)
 void	select_non_selectable(t_thread_param *param, int code)
 {
 	t_obj			*obj;
-	static t_node	*light;
 
 	obj = &(param->vars->obj);
 	if (code == K)
@@ -119,10 +114,6 @@ void	select_non_selectable(t_thread_param *param, int code)
 		obj->object = &(param->world->c);
 		return ;
 	}
-	if (light == NULL || light->next == NULL)
-		light = param->world->l;
-	else
-		light = light->next;
 	obj->type = LIGHT;
-	obj->object = light->data;
+	obj->object = &(param->world->l);
 }

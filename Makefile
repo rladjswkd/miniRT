@@ -4,7 +4,6 @@ SRCS = allocator.c\
        converter.c\
        draw.c\
        event_handler.c\
-       event_pattern.c\
        event_transformation.c\
        exit.c\
        file_processor.c\
@@ -12,7 +11,6 @@ SRCS = allocator.c\
        get_next_line_utils.c\
        initializer.c\
        intersect_closest.c\
-       intersect_cone.c\
        intersect_cylinder.c\
        intersect_plane.c\
        intersect_sphere.c\
@@ -36,7 +34,6 @@ SRCS = allocator.c\
        shadow.c\
        specular_tangent.c\
        string_utils.c\
-       uv_mapper.c\
        vec4_operations.c\
        vector_operation_1.c\
        vector_operation_2.c\

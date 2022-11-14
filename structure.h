@@ -12,7 +12,6 @@
 
 #ifndef STRUCTURE_H
 # define STRUCTURE_H
-# include <pthread.h>
 
 typedef struct s_img
 {
@@ -85,7 +84,6 @@ typedef struct s_sphere
 	t_coord	coord;
 	double	diameter;
 	t_rgb	rgb;
-	int		status;
 }	t_sp;
 
 typedef struct s_plane
@@ -96,7 +94,6 @@ typedef struct s_plane
 	int		longi;
 	t_vec	norm_const;
 	t_rgb	rgb;
-	int		status;
 }	t_pl;
 
 typedef struct s_cylinder
@@ -109,7 +106,6 @@ typedef struct s_cylinder
 	double	diameter;
 	double	height;
 	t_rgb	rgb;
-	int		status;
 }	t_cy;
 
 typedef t_cy	t_cn;
@@ -124,11 +120,10 @@ typedef struct s_world
 {
 	t_ambient	a;
 	t_camera	c;
-	t_node		*l;
+	t_light		l;
 	t_node		*sp;
 	t_node		*cy;
 	t_node		*pl;
-	t_node		*cn;
 }	t_world;
 
 typedef struct s_ray
@@ -176,8 +171,6 @@ typedef struct s_vars
 	void		*mlx;
 	void		*win;
 	t_img		img;
-	t_img		c_img;
-	t_img		b_img;
 	t_obj		obj;
 }	t_vars;
 
@@ -186,8 +179,6 @@ typedef struct s_thread_param
 	t_vars		*vars;
 	t_world		*world;
 	t_viewport	viewport;
-	int			index;
-	pthread_t	thread_id;
 }	t_thread_param;
 
 typedef struct s_uv

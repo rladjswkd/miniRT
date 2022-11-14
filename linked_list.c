@@ -16,14 +16,14 @@
 
 int	alloc_new_node(t_node **node, int index)
 {
-	static int	(*allocator[5])(void **)
-		= {alloc_light, alloc_sphere, alloc_plane, alloc_cylinder, alloc_cone};
+	static int	(*allocator[3])(void **)
+		= {alloc_sphere, alloc_plane, alloc_cylinder};
 
 	*node = (t_node *)malloc(sizeof(t_node));
 	if (!(*node))
 		return (0);
 	(*node)->next = 0;
-	if (!(*allocator[index - 2])(&((*node)->data)))
+	if (!(*allocator[index - 3])(&((*node)->data)))
 	{
 		free(*node);
 		return (0);

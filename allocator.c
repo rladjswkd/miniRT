@@ -13,17 +13,6 @@
 #include "structure.h"
 #include <stdlib.h>
 
-int	alloc_light(void **ptr)
-{
-	t_light	*l;
-
-	l = (t_light *)malloc(sizeof(t_light));
-	if (!l)
-		return (0);
-	*ptr = (void *)l;
-	return (1);
-}
-
 int	alloc_sphere(void **ptr)
 {
 	t_sp	*sp;
@@ -54,16 +43,5 @@ int	alloc_cylinder(void **ptr)
 	if (!cy)
 		return (0);
 	*ptr = (void *)cy;
-	return (1);
-}
-
-int	alloc_cone(void **ptr)
-{
-	t_cn	*cn;
-
-	cn = (t_cn *)malloc(sizeof(t_cn));
-	if (!cn)
-		return (0);
-	*ptr = (void *)cn;
 	return (1);
 }

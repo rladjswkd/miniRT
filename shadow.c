@@ -12,7 +12,6 @@
 
 #include "structure.h"
 #include "intersect_cylinder.h"
-#include "intersect_cone.h"
 #include "intersect_sphere.h"
 #include "intersect_plane.h"
 
@@ -48,22 +47,6 @@ static int	check_shadow_cy(t_ray ray, t_node *cy)
 	return (0);
 }
 
-static int	check_shadow_cn(t_ray ray, t_node *cn)
-{
-	double	cur;
-
-	cur = 2;
-	if (!cn)
-		return (0);
-	while (cn)
-	{
-		if (intersect_cone(ray, *((t_cn *)(cn->data)), &cur) && cur < 2)
-			return (1);
-		cn = cn->next;
-	}
-	return (0);
-}
-
 static int	check_shadow_pl(t_ray ray, t_node *pl)
 {
 	double	cur;
@@ -87,8 +70,6 @@ int	check_shadow(t_world world, t_ray l_ray)
 	if (check_shadow_cy(l_ray, world.cy))
 		return (1);
 	if (check_shadow_pl(l_ray, world.pl))
-		return (1);
-	if (check_shadow_cn(l_ray, world.cn))
 		return (1);
 	return (0);
 }

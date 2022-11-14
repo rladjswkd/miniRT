@@ -18,24 +18,19 @@
 
 void	destroy_world(t_world *world)
 {
-	clear_list(&(world->l));
 	clear_list(&(world->sp));
 	clear_list(&(world->pl));
 	clear_list(&(world->cy));
-	clear_list(&(world->cn));
 }
 
 void	destroy_mlx(t_vars *vars)
 {
-	mlx_destroy_image(vars->mlx, vars->b_img.ptr);
-	mlx_destroy_image(vars->mlx, vars->c_img.ptr);
-	mlx_destroy_image(vars->mlx, vars->img.ptr);
 	mlx_destroy_window(vars->mlx, vars->win);
 	mlx_destroy(vars->mlx);
 }
 
 void	exit_minirt(
-	char *msg, t_world *world, t_vars *vars, t_thread_param *param)
+	char *msg, t_world *world, t_vars *vars)
 {
 	int	exit_status;
 
@@ -49,6 +44,5 @@ void	exit_minirt(
 		destroy_world(world);
 	if (vars)
 		destroy_mlx(vars);
-	free(param);
 	exit(exit_status);
 }

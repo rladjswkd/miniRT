@@ -26,15 +26,11 @@ static int	set_object_list(t_world *rt, int index)
 
 	if (!alloc_new_node(&new_node, index))
 		return (0);
-	objects = &(rt->l);
-	if (index == 3)
-		objects = &(rt->sp);
-	else if (index == 4)
+	objects = &(rt->sp);
+	if (index == 4)
 		objects = &(rt->pl);
 	else if (index == 5)
 		objects = &(rt->cy);
-	else if (index == 6)
-		objects = &(rt->cn);
 	append_node(objects, new_node);
 	return (1);
 }
@@ -44,8 +40,8 @@ int	set_world(char *line, t_world *rt, int *mask)
 	char		**splitted;
 	int			cnt;
 	int			index;
-	static int	(*fp[7])(char **, int, t_world *) = {set_ambient, set_camera,
-		set_light, set_sphere, set_plane, set_cylinder, set_cylinder};
+	static int	(*fp[6])(char **, int, t_world *) = {set_ambient, set_camera,
+		set_light, set_sphere, set_plane, set_cylinder};
 
 	splitted = split_line(line, ' ', &cnt);
 	if (!(splitted && splitted[0]))
@@ -53,10 +49,10 @@ int	set_world(char *line, t_world *rt, int *mask)
 	index = check_identifier(splitted[0]);
 	if (index == -1)
 		return (free_splitted(splitted, 0));
-	if (index < 2 && (*mask & 1 << index || !(*fp[index])(splitted, cnt, rt)))
+	if (index < 3 && (*mask & 1 << index || !(*fp[index])(splitted, cnt, rt)))
 		return (free_splitted(splitted, 0));
 	*mask |= 1 << index;
-	if (1 < index
+	if (2 < index
 		&& (!set_object_list(rt, index) || !(*fp[index])(splitted, cnt, rt)))
 		return (free_splitted(splitted, 0));
 	return (free_splitted(splitted, 1));

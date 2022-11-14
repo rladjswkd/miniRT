@@ -13,7 +13,6 @@
 #include "structure.h"
 #include "constant.h"
 #include "intersect_cylinder.h"
-#include "intersect_cone.h"
 #include "intersect_plane.h"
 #include "intersect_sphere.h"
 #include <math.h>
@@ -81,27 +80,6 @@ static void	check_pl(t_ray ray, t_node *pl, t_obj *obj)
 	obj->t = t;
 }
 
-static void	check_cn(t_ray ray, t_node *cn, t_obj *obj)
-{
-	double	cur;
-	double	t;
-
-	if (!cn)
-		return ;
-	t = obj->t;
-	while (cn)
-	{
-		if (intersect_cone(ray, *((t_cn *)(cn->data)), &cur) && cur < t)
-		{
-			t = cur;
-			obj->type = CONE;
-			obj->object = (t_cn *)(cn->data);
-		}
-		cn = cn->next;
-	}
-	obj->t = t;
-}
-
 int	intersect(t_ray ray, t_world world, t_obj *obj)
 {
 	obj->type = NONE;
@@ -109,6 +87,5 @@ int	intersect(t_ray ray, t_world world, t_obj *obj)
 	check_sp(ray, world.sp, obj);
 	check_cy(ray, world.cy, obj);
 	check_pl(ray, world.pl, obj);
-	check_cn(ray, world.cn, obj);
 	return (obj->type);
 }

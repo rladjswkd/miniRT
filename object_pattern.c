@@ -14,23 +14,6 @@
 #include "vector_operation.h"
 #include <math.h>
 
-char	uv_pattern_at(t_uv uv, int w, int h)
-{
-	if (((int)floor(uv.u * w) + (int)floor(uv.v * h)) % 2)
-		return (1);
-	return (0);
-}
-
-t_rgb	get_img_rgb(t_img img, t_uv uv)
-{
-	int	i;
-
-	i = img.width * uv.u + ((int)(img.height * uv.v)) * img.width;
-	i *= 4;
-	return ((t_rgb){(unsigned char)img.addr[i + 2],
-		(unsigned char)img.addr[i + 1], (unsigned char)img.addr[i]});
-}
-
 t_vec	get_basis_vec(t_vec v)
 {
 	t_vec	bx;

@@ -78,7 +78,7 @@ int	set_light(char **info, int cnt, t_world *world)
 
 	if (cnt != 4)
 		return (0);
-	l = (t_light *)(get_last_node(world->l)->data);
+	l = &(world->l);
 	if (!set_coordinate(info[1], &(l->coord)))
 		return (0);
 	if (!get_double(info[2], &intensitiy) || intensitiy < 0 || 1 < intensitiy)

@@ -30,7 +30,6 @@ int	set_plane(char **info, int cnt, t_world *world)
 		return (0);
 	if (!set_rgb(info[3], &(pl->rgb)))
 		return (0);
-	pl->status = 0;
 	pl->longi = 0;
 	pl->lati = 0;
 	pl->norm_const = pl->norm;
@@ -52,7 +51,6 @@ int	set_sphere(char **info, int cnt, t_world *world)
 	if (!set_rgb(info[3], &(sp->rgb)))
 		return (0);
 	sp->diameter = diameter;
-	sp->status = 0;
 	return (1);
 }
 
@@ -81,6 +79,5 @@ int	set_cylinder(char **info, int cnt, t_world *world)
 	cy->norm_const = cy->norm;
 	cy->diameter = diameter;
 	cy->height = height;
-	cy->status = 0;
 	return (1);
 }

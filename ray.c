@@ -29,17 +29,6 @@ t_ray	get_l_ray(t_light l, t_vec p)
 	return (l_ray);
 }
 
-static int	get_status(int type, void *object)
-{
-	if (type == SPHERE)
-		return (((t_sp *)object)->status);
-	if (type == CYLINDER)
-		return (((t_cy *)object)->status);
-	if (type == PLANE)
-		return (((t_pl *)object)->status);
-	return (((t_cn *)object)->status);
-}
-
 static void	dot_pixel(t_img *img, t_rgb color, int i)
 {
 	int		pixel;
@@ -63,10 +52,8 @@ int	trace_ray(t_vars *vars, t_world *world, t_ray ray, int i)
 	{
 		p = vec_add(ray.pos, vec_scale(ray.dir, obj.t));
 		n = get_tangent_norm(obj, p, ray.dir);
-		if (get_status(obj.type, obj.object) & BUMP)
-			n = get_bump_norm(vars, obj, p, n);
-		color = get_obj_rgb(vars, obj, p, compute_lighting(
-					p, n, vec_neg(vec_normalize(ray.dir)), *world));
+		color = get_obj_rgb(obj, compute_lighting(
+					p, n, *world));
 	}
 	dot_pixel(&vars->img, color, i);
 	return (0);

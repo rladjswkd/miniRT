@@ -14,6 +14,5 @@
 # define DRAW_H
 # include "structure.h"
 
-void	*drawing(void *b_param);
-int		draw_img(t_thread_param *param);
+void		draw_img(t_world *world, t_vars *vars);
 #endif

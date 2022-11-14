@@ -13,7 +13,6 @@
 #include "structure.h"
 #include "constant.h"
 #include "vector_operation.h"
-#include "uv_mapper.h"
 #include <math.h>
 
 static t_vec	get_tangent_norm_sp(t_sp *sp, t_coord p, t_vec ray_dir)
@@ -60,33 +59,6 @@ static t_vec	get_tangent_norm_pl(t_pl *pl, t_vec ray_dir)
 	return (pl->norm);
 }
 
-static t_vec	get_tangent_norm_cn(t_cn *cn, t_coord p, t_vec ray_dir)
-{
-	double	a;
-	double	b;
-	t_vec	ret;
-
-	a = vec_dot(p, cn->norm);
-	b = vec_dot(vec_add(cn->coord, vec_scale(cn->norm, cn->height)), cn->norm);
-	if (fabs(a - b) < 1e-6)
-	{
-		if (vec_dot(ray_dir, cn->norm) > 0)
-			return (vec_scale(cn->norm, -1));
-		return (cn->norm);
-	}
-	b = vec_dot(cn->coord, cn->norm);
-	if (fabs(a - b) < 1e-6)
-	{
-		if (vec_dot(ray_dir, cn->norm) > 0)
-			return (vec_scale(cn->norm, -1));
-		return (cn->norm);
-	}
-	ret = get_cone_body_norm(p, *cn);
-	if (vec_dot(ray_dir, ret) > 0)
-		return (vec_scale(ret, -1));
-	return (ret);
-}
-
 t_vec	get_tangent_norm(t_obj obj, t_coord p, t_vec ray_dir)
 {
 	t_vec	n;
@@ -98,7 +70,5 @@ t_vec	get_tangent_norm(t_obj obj, t_coord p, t_vec ray_dir)
 		n = get_tangent_norm_cy(obj.object, p, ray_dir);
 	else if (obj.type == PLANE)
 		n = get_tangent_norm_pl(obj.object, ray_dir);
-	else if (obj.type == CONE)
-		n = get_tangent_norm_cn(obj.object, p, ray_dir);
 	return (n);
 }
