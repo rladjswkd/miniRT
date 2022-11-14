@@ -47,7 +47,8 @@ int	key_press_handler(int code, t_thread_param *param)
 		apply_bump(vars->obj);
 	else if (code == I)
 		apply_img(vars->obj);
-	draw_img(param);
+	if (!draw_img(param))
+		exit_minirt(ERROR_MSG, param->world, vars, param);
 	return (0);
 }
 
