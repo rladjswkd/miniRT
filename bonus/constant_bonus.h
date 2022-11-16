@@ -6,12 +6,12 @@
 /*   By: gyepark <gyepark@student.42seoul.kr>       +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2022/11/11 19:57:50 by gyepark           #+#    #+#             */
-/*   Updated: 2022/11/11 19:58:00 by gyepark          ###   ########.fr       */
+/*   Updated: 2022/11/16 16:16:31 by gyepark          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#ifndef CONSTANT_H
-# define CONSTANT_H
+#ifndef CONSTANT_BONUS_H
+# define CONSTANT_BONUS_H
 
 # define ERROR_MSG			"Error\nSomething went wrong!\n"
 
