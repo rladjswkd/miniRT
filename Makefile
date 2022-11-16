@@ -1,6 +1,45 @@
 NAME = miniRT
 BONUS_NAME = miniRT_bonus
 
+FILES = allocator.c\
+		checker.c\
+		converter.c\
+		draw.c\
+		event_handler.c\
+		event_transformation.c\
+		exit.c\
+		file_processor.c\
+		get_next_line.c\
+		get_next_line_utils.c\
+		initializer.c\
+		intersect_closest.c\
+		intersect_cylinder.c\
+		intersect_plane.c\
+		intersect_sphere.c\
+		intersect_world.c\
+		lighting.c\
+		linked_list.c\
+		main.c\
+		matrix_inverse.c\
+		matrix_multiplication.c\
+		matrix_rotation.c\
+		matrix_transformation.c\
+		matrix_transpose.c\
+		normal_transformation.c\
+		object_color.c\
+		object_pattern.c\
+		parser_util_split.c\
+		ray.c\
+		set_additional.c\
+		set_essential.c\
+		set_world.c\
+		shadow.c\
+		specular_tangent.c\
+		string_utils.c\
+		vec4_operations.c\
+		vector_operation_1.c\
+		vector_operation_2.c\
+		viewport.c
 BONUS_FILES = allocator_bonus.c\
        checker_bonus.c\
        converter_bonus.c\
@@ -44,15 +83,18 @@ BONUS_FILES = allocator_bonus.c\
        vector_operation_2_bonus.c\
        viewport_bonus.c
 BONUS_DIR = ./bonus/
+DIR = ./mandatory/
 BONUS_SRCS = ${addprefix $(BONUS_DIR), $(BONUS_FILES)}
+SRCS = ${addprefix $(DIR), $(FILES)}
 BONUS_OBJS = $(BONUS_SRCS:.c=.o)
+OBJS = $(SRCS:.c=.o)
 CC = cc
 CFLAGS = -Wall -Wextra -Werror
 RM = rm
 RMFLAGS = -f
 
 %.o : %.c
-	$(CC) $(CFLAGS) -Imlx -g -c $< -o $@
+	$(CC) $(CFLAGS) -Imlx -O3 -c $< -o $@
 
 all : $(NAME)
 
@@ -70,7 +112,7 @@ clean :
 	$(RM) $(RMFLAGS) $(BONUS_OBJS)
 
 fclean : clean
-	$(RM) $(RMFLAGS) $(NAME)
+	$(RM) $(RMFLAGS) $(NAME) $(BONUS_NAME)
 
 bonus : $(BONUS_NAME)
 
