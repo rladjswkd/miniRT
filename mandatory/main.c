@@ -36,17 +36,17 @@ static t_mat	get_matrix_c_to_z(t_world *world)
 	ry = get_ry_to_z(c_dir);
 	c_dir = vec4_to_vec(mat_mul_vec4(ry, vec_to_vec4(c_dir)));
 	r_opposite = (t_mat){
-		{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1}}, 4};
+	{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1}}, 4};
 	if (c_dir.z < 0)
 		r_opposite = mat_rx(cos(M_PI), sin(M_PI));
 	c_dir = vec4_to_vec(mat_mul_vec4(r_opposite, vec_to_vec4(c_dir)));
 	return (mat_mul(r_opposite, mat_mul(ry, rx)));
 }
 
-static void rotate_coord(t_node *sp_node, t_node *l_node, t_mat op)
+static void	rotate_coord(t_node *sp_node, t_node *l_node, t_mat op)
 {
 	t_sp	*sp;
-	t_light *l;
+	t_light	*l;
 
 	while (sp_node)
 	{
@@ -66,7 +66,8 @@ static void	rotate_coord_and_norm(t_node *node, t_mat op)
 	{
 		info = (t_obj_info *)(node->data);
 		info->coord = vec4_to_vec(mat_mul_vec4(op, vec_to_vec4(info->coord)));
-		info->norm_const = vec4_to_vec(mat_mul_vec4(op, vec_to_vec4(info->norm_const)));
+		info->norm_const = vec4_to_vec(
+				mat_mul_vec4(op, vec_to_vec4(info->norm_const)));
 		info->norm = info->norm_const;
 		node = node->next;
 	}
