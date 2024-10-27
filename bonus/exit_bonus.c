@@ -31,7 +31,8 @@ void	destroy_mlx(t_vars *vars)
 	mlx_destroy_image(vars->mlx, vars->c_img.ptr);
 	mlx_destroy_image(vars->mlx, vars->img.ptr);
 	mlx_destroy_window(vars->mlx, vars->win);
-	mlx_destroy(vars->mlx);
+	// linux 버전 mlx에선 유효하지 않은 함수
+	// mlx_destroy(vars->mlx);
 }
 
 void	exit_minirt(

@@ -92,22 +92,38 @@ CC = cc
 CFLAGS = -Wall -Wextra -Werror
 RM = rm
 RMFLAGS = -f
+UNAME = $(shell uname)
 
 %.o : %.c
-	$(CC) $(CFLAGS) -Imlx -O3 -c $< -o $@
+ifeq ($(UNAME), Linux)
+	$(CC) -I/usr/include -Imlx_linux -pthread -O3 -c $< -o $@
+else
+	$(CC) -Imlx -pthread -O3 -c $< -o $@
+endif
 
 all : $(NAME)
 
 $(NAME) : $(OBJS)
+ifeq ($(UNAME), Linux)
+	@make -C mlx_linux 2> /dev/null
+	$(CC) $(OBJS) -Lmlx_linux -lmlx_Linux -L/usr/lib -Imlx_linux -lXext -lX11 -lm -lz -o $(NAME)
+else	
 	@make -C mlx 2> /dev/null
 	$(CC) $(OBJS) -Lmlx -lmlx -framework OpenGL -framework AppKit -o $(NAME)
+endif
 
 $(BONUS_NAME) : $(BONUS_OBJS)
+ifeq ($(UNAME), Linux)
+	@make -C mlx_linux 2> /dev/null
+	$(CC) $(BONUS_OBJS) -Lmlx_linux -lmlx_Linux -L/usr/lib -Imlx_linux -pthread -lXext -lX11 -lm -lz -o $(BONUS_NAME)
+else	
 	@make -C mlx 2> /dev/null
-	$(CC) $(BONUS_OBJS) -Lmlx -lmlx -framework OpenGL -framework AppKit -o $(BONUS_NAME)
+	$(CC) $(BONUS_OBJS) -Lmlx -lmlx -pthread -framework OpenGL -framework AppKit -o $(BONUS_NAME)
+endif
 
 clean :
 	@make clean -C mlx
+	@make clean -C mlx_linux
 	$(RM) $(RMFLAGS) $(OBJS)
 	$(RM) $(RMFLAGS) $(BONUS_OBJS)
 

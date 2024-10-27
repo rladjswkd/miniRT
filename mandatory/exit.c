@@ -26,7 +26,8 @@ void	destroy_world(t_world *world)
 void	destroy_mlx(t_vars *vars)
 {
 	mlx_destroy_window(vars->mlx, vars->win);
-	mlx_destroy(vars->mlx);
+	// linux 버전 mlx에선 유효하지 않은 함수
+	// mlx_destroy(vars->mlx);
 }
 
 void	exit_minirt(
